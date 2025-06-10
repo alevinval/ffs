@@ -1,0 +1,14 @@
+[package]
+name = "ffs"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+path = "src/lib.rs"
+
+# Optional if you have a single binary in src/main.rs
+[[bin]]
+name = "mycrate"
+path = "src/main.rs"
+
+[dependencies]
