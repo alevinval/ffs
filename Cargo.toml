@@ -1,0 +1,20 @@
+[package]
+name = "ffs"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+default = ["std"]
+std = []
+debug = []
+
+[lib]
+path = "src/lib.rs"
+
+# Optional if you have a single binary in src/main.rs
+[[bin]]
+name = "ffs"
+path = "src/bin/main.rs"
+features = ["std"]
+
+[dependencies]
