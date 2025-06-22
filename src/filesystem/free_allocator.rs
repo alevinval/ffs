@@ -20,7 +20,7 @@ impl Default for FreeBlockAllocator {
 }
 
 impl FreeBlockAllocator {
-    pub const LEN: usize = Layout::FREE.len();
+    pub const LEN: usize = Layout::FREE.len() as usize;
 
     /// Returns a [`FreeBlockAllocator`] instance with all addresses marked as free.
     pub const fn new() -> Self {
