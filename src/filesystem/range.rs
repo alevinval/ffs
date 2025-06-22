@@ -18,8 +18,8 @@ impl Range {
         self.1
     }
 
-    pub const fn len(&self) -> usize {
-        (self.end() - self.begin()) as usize
+    pub const fn len(&self) -> Addr {
+        self.end() - self.begin()
     }
 
     pub const fn nth(&self, nth: Addr) -> Addr {
@@ -29,12 +29,17 @@ impl Range {
     }
 
     pub const fn next(&self, shift: usize) -> Self {
-        Self(self.end(), self.end() + shift as u32)
+        Self(self.end(), self.end() + shift as Addr)
+    }
+
+    pub const fn range_sectors(&self) -> core::ops::Range<Addr> {
+        self.begin()..self.end()
     }
 }
 
 #[cfg(test)]
 mod test {
+
     use super::*;
 
     #[test]
@@ -42,6 +47,14 @@ mod test {
         let range = Range::new(0, 10);
         assert_eq!(range.begin(), 0);
         assert_eq!(range.end(), 10);
+    }
+
+    #[test]
+    fn range_sectors() {
+        let range = Range::new(5, 10);
+        let iter = range.range_sectors();
+        assert_eq!(5, iter.start);
+        assert_eq!(10, iter.end)
     }
 
     #[test]
