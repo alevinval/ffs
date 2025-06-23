@@ -56,7 +56,7 @@ where
         let entry = self.directory.add_file(file_name)?;
         let file = File::new(file_name, entry.file_addr());
         let node = self.data_allocator.allocate_node_data(file_size)?;
-        DataWriter::new(node.block_addrs(), data).write(&mut self.device)?;
+        DataWriter::new(node.block_addrs(), data).write_to_device(&mut self.device)?;
         NodeWriter::new(file.addr(), &node).write_to_device(&mut self.device)?;
         file.write_to_device(&mut self.device)?;
         self.directory.write_to_device(&mut self.device)?;

@@ -1,6 +1,6 @@
 use crate::{
     BlockDevice, Error,
-    filesystem::{Addr, Block, Layout},
+    filesystem::{Addr, Block, Layout, WriteToDevice},
 };
 
 pub struct DataWriter<'a> {
@@ -18,11 +18,13 @@ impl<'a> DataWriter<'a> {
 
         Self { block_addrs, data }
     }
+}
 
-    pub fn write<D>(&self, device: &mut D) -> Result<(), Error>
-    where
-        D: BlockDevice,
-    {
+impl<D> WriteToDevice<D> for DataWriter<'_>
+where
+    D: BlockDevice,
+{
+    fn write_to_device(&self, device: &mut D) -> Result<(), Error> {
         for (i, chunk) in self.data.chunks(Block::LEN).enumerate() {
             let addr = self.block_addrs[i];
             let sector = Layout::DATA.nth(addr);
@@ -44,7 +46,7 @@ mod test {
         let mut out = MockDevice::new();
         let sut = DataWriter::new(&[0, 1, 2, 3], "hello world".as_bytes());
 
-        sut.write(&mut out)?;
+        sut.write_to_device(&mut out)?;
 
         assert_eq!(1, out.writes.len());
         out.assert_write(0, Layout::DATA.nth(0), "hello world".as_bytes());
@@ -55,7 +57,7 @@ mod test {
     fn write_multiple_chunks() -> Result<(), Error> {
         let mut out = MockDevice::new();
         let sut = DataWriter::new(&[0, 1, 2, 3, 4], &[13u8; 2500]);
-        sut.write(&mut out)?;
+        sut.write_to_device(&mut out)?;
 
         assert_eq!(5, out.writes.len());
 
