@@ -3,6 +3,7 @@ pub use controller::Controller;
 
 use data_writer::DataWriter;
 use file::File;
+use file_handle::FileHandle;
 use file_name::FileName;
 use free::Free;
 use free_allocator::FreeBlockAllocator;

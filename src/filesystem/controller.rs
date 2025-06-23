@@ -1,8 +1,9 @@
 use crate::{
     Addr, BlockDevice, Error,
     filesystem::{
-        DataWriter, EraseFromDevice, File, FileName, FreeBlockAllocator, MAX_FILENAME_LEN,
-        MAX_FILES, Meta, Node, StaticReadFromDevice, WriteToDevice, node_writer::NodeWriter,
+        DataWriter, EraseFromDevice, File, FileHandle, FileName, FreeBlockAllocator,
+        MAX_FILENAME_LEN, MAX_FILES, Meta, Node, StaticReadFromDevice, WriteToDevice,
+        node_writer::NodeWriter,
     },
 };
 
@@ -82,7 +83,7 @@ where
         if let Some((file, node)) = self.find_file(filename) {
             node.block_addrs().iter().for_each(|addr| self.allocator.release(*addr));
             NodeWriter::new(file.addr(), &node).erase_from_device(&mut self.device)?;
-            file.erase_from_device(&mut self.device)?;
+            FileHandle::new(file.addr()).erase_from_device(&mut self.device)?;
             self.allocator.write_to_device(&mut self.device)?;
 
             self.entries[file.addr() as usize] = None;

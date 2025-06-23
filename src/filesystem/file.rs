@@ -2,9 +2,7 @@ use core::str;
 
 use crate::{
     Addr, BlockDevice, Error,
-    filesystem::{
-        Block, Deserializable, EraseFromDevice, FileName, Layout, Serializable, WriteToDevice,
-    },
+    filesystem::{Block, Deserializable, FileName, Layout, Serializable, WriteToDevice},
     io::{Read, Write},
 };
 
@@ -60,17 +58,6 @@ where
     }
 }
 
-impl<D> EraseFromDevice<D> for File
-where
-    D: BlockDevice,
-{
-    fn erase_from_device(&self, out: &mut D) -> Result<(), Error> {
-        let sector = Layout::FILE.nth(self.addr);
-        let block = Block::new();
-        out.write_block(sector, &block)
-    }
-}
-
 #[cfg(test)]
 mod test {
     use crate::{filesystem::MAX_FILENAME_LEN, io::Reader, test_utils::MockDevice};
@@ -112,15 +99,6 @@ mod test {
         sut.serialize(&mut expected.writer())?;
         out.assert_write(0, Layout::FILE.nth(123), &expected);
 
-        Ok(())
-    }
-
-    #[test]
-    fn erase_from_device() -> Result<(), Error> {
-        let mut out = MockDevice::new();
-        let sut = File::new("some-file.txt".into(), 123);
-        sut.erase_from_device(&mut out)?;
-        out.assert_write(0, Layout::FILE.nth(123), &[0; Block::LEN]);
         Ok(())
     }
 }

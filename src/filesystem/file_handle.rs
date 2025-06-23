@@ -1,6 +1,6 @@
 use crate::{
     BlockDevice, Error,
-    filesystem::{Addr, Block, Deserializable, File, Layout, ReadFromDevice},
+    filesystem::{Addr, Block, Deserializable, EraseFromDevice, File, Layout, ReadFromDevice},
 };
 
 /// A handle to a file in the filesystem, identified by its address.
@@ -8,7 +8,7 @@ use crate::{
 /// This struct does not own the file data, but provides a way to load the file
 /// from a block device using the stored address.
 pub struct FileHandle {
-    /// The addr of the file in the filesystem.
+    /// The logical address of the [`File`] in the filesystem.
     addr: Addr,
 }
 
@@ -27,6 +27,17 @@ impl<D: BlockDevice> ReadFromDevice<D> for FileHandle {
         let mut block = Block::new();
         device.read_block(sector, &mut block)?;
         File::deserialize(&mut block.reader())
+    }
+}
+
+impl<D> EraseFromDevice<D> for FileHandle
+where
+    D: BlockDevice,
+{
+    fn erase_from_device(&self, out: &mut D) -> Result<(), Error> {
+        let sector = Layout::FILE.nth(self.addr);
+        let block = Block::new();
+        out.write_block(sector, &block)
     }
 }
 
@@ -53,6 +64,15 @@ mod test {
 
         assert_eq!(expected, actual);
 
+        Ok(())
+    }
+
+    #[test]
+    fn erase_from_device() -> Result<(), Error> {
+        let mut out = MockDevice::new();
+        let sut = FileHandle::new(123);
+        sut.erase_from_device(&mut out)?;
+        out.assert_write(0, Layout::FILE.nth(123), &[0; Block::LEN]);
         Ok(())
     }
 }
