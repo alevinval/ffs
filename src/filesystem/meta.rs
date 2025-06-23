@@ -13,6 +13,7 @@ pub struct Meta {
     free_sector: Addr,
     data_sector: Addr,
     block_size: u16,
+    signature: [u8; 2],
 }
 
 impl Default for Meta {
@@ -31,6 +32,7 @@ impl Meta {
             free_sector: Layout::FREE.begin(),
             data_sector: Layout::DATA.begin(),
             block_size: Block::LEN as u16,
+            signature: Self::SIGNATURE,
         }
     }
 }
@@ -56,14 +58,10 @@ impl Deserializable<Meta> for Meta {
         let data_sector = reader.read_u32()?;
         let block_size = reader.read_u16()?;
         reader.read(&mut [0; 492])?;
-
         let mut signature = [0u8; 2];
         reader.read(&mut signature)?;
-        if signature != Self::SIGNATURE {
-            return Err(Error::Unsupported);
-        }
 
-        Ok(Meta { file_sector, node_sector, free_sector, data_sector, block_size })
+        Ok(Meta { file_sector, node_sector, free_sector, data_sector, block_size, signature })
     }
 }
 
@@ -107,24 +105,6 @@ mod test {
     use crate::test_utils::MockDevice;
 
     use super::*;
-    #[test]
-    fn serialize_writes_signature() -> Result<(), Error> {
-        let mut block = Block::new();
-        let meta = Meta::new();
-        meta.serialize(&mut block.writer())?;
-        assert_eq!(&block[510..512], &Meta::SIGNATURE);
-        Ok(())
-    }
-
-    #[test]
-    fn deserialize_invalid_signature_panics() {
-        let mut block = Block::new();
-        let meta = Meta::new();
-        meta.serialize(&mut block.writer()).unwrap();
-        block[510] = 0x00; // Corrupt the signature
-
-        assert_eq!(Err(Error::Unsupported), Meta::deserialize(&mut block.reader()));
-    }
 
     #[test]
     fn serde_symmetry() -> Result<(), Error> {
@@ -139,11 +119,19 @@ mod test {
     }
 
     #[test]
-    fn erase_from_device() {
-        let mut out = MockDevice::new();
-        let sut = Meta::new();
-        assert_eq!(Ok(()), sut.erase_from_device(&mut out));
+    fn write_to_device_then_read() {
+        let mut device = MockDevice::new();
+        let expected = Meta::new();
+        assert_eq!(Ok(()), expected.write_to_device(&mut device));
+        assert_eq!(Ok(expected), Meta::read_from_device(&mut device));
+    }
 
-        out.assert_write(0, 0, &[0u8; Block::LEN]);
+    #[test]
+    fn erase_from_device() {
+        let mut device = MockDevice::new();
+        let sut = Meta::new();
+        assert_eq!(Ok(()), sut.erase_from_device(&mut device));
+
+        device.assert_write(0, 0, &[0u8; Block::LEN]);
     }
 }

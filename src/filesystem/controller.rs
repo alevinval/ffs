@@ -22,7 +22,10 @@ where
     D: BlockDevice,
 {
     pub fn from(mut device: D) -> Result<Controller<D>, Error> {
-        Meta::read_from_device(&mut device).map_err(|_| Error::Unsupported)?;
+        if Meta::read_from_device(&mut device)? != Meta::new() {
+            return Err(Error::Unsupported);
+        }
+
         Ok(Self {
             entries: [const { None }; MAX_FILES],
             allocator: FreeBlockAllocator::new(),
