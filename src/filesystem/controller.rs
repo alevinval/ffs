@@ -1,9 +1,8 @@
 use crate::{
     Addr, BlockDevice, Error,
     filesystem::{
-        DataWriter, EraseFromDevice, File, FileHandle, FileName, FreeBlockAllocator,
-        MAX_FILENAME_LEN, MAX_FILES, Meta, Node, NodeHandle, NodeWriter, StaticReadFromDevice,
-        WriteToDevice,
+        DataAllocator, DataWriter, EraseFromDevice, File, FileHandle, FileName, MAX_FILENAME_LEN,
+        MAX_FILES, Meta, Node, NodeHandle, NodeWriter, StaticReadFromDevice, WriteToDevice,
     },
 };
 
@@ -13,7 +12,7 @@ where
     D: BlockDevice,
 {
     entries: [Option<(File, Node)>; MAX_FILES],
-    allocator: FreeBlockAllocator,
+    data_allocator: DataAllocator,
     file_count: Addr,
     device: D,
 }
@@ -29,7 +28,7 @@ where
 
         Ok(Self {
             entries: [const { None }; MAX_FILES],
-            allocator: FreeBlockAllocator::new(),
+            data_allocator: DataAllocator::new(),
             file_count: 0,
             device,
         })
@@ -58,10 +57,7 @@ where
             return Err(Error::StorageFull);
         }
 
-        let mut block_addrs = [0 as Addr; Node::BLOCKS_PER_NODE];
-        self.allocator.allocate_bytes(file_size, &mut block_addrs)?;
-
-        let node = Node::new(file_size as u16, block_addrs);
+        let node = self.data_allocator.allocate_node_data(file_size)?;
         let file = File::new(file_name, self.file_count);
 
         file.write_to_device(&mut self.device)?;
@@ -70,7 +66,7 @@ where
             .write(&mut self.device)
             .expect("cannot write data");
 
-        self.allocator.write_to_device(&mut self.device)?;
+        self.data_allocator.write_to_device(&mut self.device)?;
 
         let pos = self.file_count as usize;
         self.entries[pos] = Some((file, node));
@@ -81,10 +77,10 @@ where
 
     pub fn delete(&mut self, filename: &str) -> Result<(), Error> {
         if let Some((file, node)) = self.find_file(filename) {
-            node.block_addrs().iter().for_each(|addr| self.allocator.release(*addr));
+            self.data_allocator.release_node_data(&node);
             NodeHandle::new(file.addr()).erase_from_device(&mut self.device)?;
             FileHandle::new(file.addr()).erase_from_device(&mut self.device)?;
-            self.allocator.write_to_device(&mut self.device)?;
+            self.data_allocator.write_to_device(&mut self.device)?;
 
             self.entries[file.addr() as usize] = None;
             self.file_count -= 1;

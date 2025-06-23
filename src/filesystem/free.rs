@@ -6,7 +6,7 @@ use crate::{
 
 /// Tracks the free status of an address space.
 #[derive(PartialEq, Eq, Debug)]
-pub struct Free {
+pub(crate) struct Free {
     inner: Block,
     last_free: usize,
 }

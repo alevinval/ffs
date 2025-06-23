@@ -1,12 +1,12 @@
 pub use block::Block;
 pub use controller::Controller;
 
+use data_allocator::DataAllocator;
 use data_writer::DataWriter;
 use file::File;
 use file_handle::FileHandle;
 use file_name::FileName;
 use free::Free;
-use free_allocator::FreeBlockAllocator;
 use meta::Meta;
 use node::Node;
 use node_handle::NodeHandle;
@@ -20,12 +20,12 @@ use crate::{
 
 mod block;
 mod controller;
+mod data_allocator;
 mod data_writer;
 mod file;
 mod file_handle;
 mod file_name;
 mod free;
-mod free_allocator;
 mod meta;
 mod node;
 mod node_handle;

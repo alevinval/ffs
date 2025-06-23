@@ -1,34 +1,53 @@
 use crate::{
     BlockDevice, Error,
     filesystem::{
-        Addr, Block, Deserializable, Free, Layout, Serializable, StaticReadFromDevice,
+        Addr, Block, Deserializable, Free, Layout, Node, Serializable, StaticReadFromDevice,
         WriteToDevice,
     },
 };
 
 #[derive(Debug)]
-pub struct FreeBlockAllocator {
+pub(crate) struct DataAllocator {
     inner: [Free; Self::LEN],
     dirty: [bool; Self::LEN],
     last_pos: usize,
 }
 
-impl Default for FreeBlockAllocator {
+impl Default for DataAllocator {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl FreeBlockAllocator {
+impl DataAllocator {
     pub const LEN: usize = Layout::FREE.len() as usize;
 
-    /// Returns a [`FreeBlockAllocator`] instance with all addresses marked as free.
+    /// Returns a [`DataAllocator`] instance with all addresses marked as free.
     pub const fn new() -> Self {
         Self { inner: [const { Free::new() }; Self::LEN], dirty: [false; Self::LEN], last_pos: 0 }
     }
 
+    /// Attempts to allocate enough blocks to fit `file_size` bytes and returns a [`Node`] instance
+    /// with all the allocated addresses.
+    pub fn allocate_node_data(&mut self, file_size: usize) -> Result<Node, Error> {
+        let mut block_addrs = [0; Node::BLOCKS_PER_NODE];
+        self.allocate_bytes(file_size, &mut block_addrs)?;
+        Ok(Node::new(file_size as u16, block_addrs))
+    }
+
+    /// Releases all blocks associated with the given [`Node`].
+    pub fn release_node_data(&mut self, node: &Node) {
+        for addr in node.block_addrs() {
+            self.release(*addr);
+        }
+    }
+
+    pub fn count_free_addresses(&self) -> Addr {
+        self.inner.iter().map(|f| f.count_free_addresses()).sum()
+    }
+
     /// Attempts to allocate enough blocks to fit `file_size` bytes.
-    pub fn allocate_bytes(&mut self, file_size: usize, out: &mut [Addr]) -> Result<(), Error> {
+    fn allocate_bytes(&mut self, file_size: usize, out: &mut [Addr]) -> Result<(), Error> {
         self.allocate_n(file_size / Block::LEN, out)
     }
 
@@ -44,7 +63,7 @@ impl FreeBlockAllocator {
     /// - `Err(Error::StorageFull)` if fewer than `n` blocks could be allocated. In this case,
     ///   allocated blocks will be automatically released.
     ///
-    pub fn allocate_n(&mut self, n: usize, out: &mut [Addr]) -> Result<(), Error> {
+    fn allocate_n(&mut self, n: usize, out: &mut [Addr]) -> Result<(), Error> {
         if out.len() < n {
             return Err(Error::BufferTooSmall { expected: n, found: out.len() });
         }
@@ -76,7 +95,7 @@ impl FreeBlockAllocator {
     /// # Notes
     /// - Uses a circular scan starting from `self.last_pos` for improved allocation locality.
     /// - Updates `self.last_pos` to the most recent allocation position to avoid always starting from 0.
-    pub fn allocate(&mut self) -> Result<Addr, Error> {
+    fn allocate(&mut self) -> Result<Addr, Error> {
         let len = self.inner.len();
 
         for i in 0..len {
@@ -99,7 +118,7 @@ impl FreeBlockAllocator {
     /// # Notes
     /// - Safe to call multiple times on the same address, though redundant calls may have no effect.
     /// - May adjust `self.last_pos` to improve future allocation locality.
-    pub const fn release(&mut self, addr: Addr) {
+    const fn release(&mut self, addr: Addr) {
         let pos = addr_to_pos(addr);
         self.inner[pos].release(addr_to_offset(addr));
         self.dirty[pos] = true;
@@ -107,13 +126,9 @@ impl FreeBlockAllocator {
             self.last_pos = pos;
         }
     }
-
-    pub fn count_free_addresses(&self) -> Addr {
-        self.inner.iter().map(|f| f.count_free_addresses()).sum()
-    }
 }
 
-impl<D> WriteToDevice<D> for FreeBlockAllocator
+impl<D> WriteToDevice<D> for DataAllocator
 where
     D: BlockDevice,
 {
@@ -128,7 +143,7 @@ where
     }
 }
 
-impl<D> StaticReadFromDevice<D> for FreeBlockAllocator
+impl<D> StaticReadFromDevice<D> for DataAllocator
 where
     D: BlockDevice,
 {
@@ -163,7 +178,7 @@ mod test {
 
     use super::*;
 
-    fn take_nth_blocks(sut: &mut FreeBlockAllocator, n: usize) -> Result<Addr, Error> {
+    fn take_nth_blocks(sut: &mut DataAllocator, n: usize) -> Result<Addr, Error> {
         let mut last = Ok(0);
         for _ in 0..n {
             last = sut.allocate();
@@ -173,7 +188,7 @@ mod test {
 
     #[test]
     fn allocate() {
-        let mut sut = FreeBlockAllocator::new();
+        let mut sut = DataAllocator::new();
         assert_eq!(8192, sut.count_free_addresses());
         assert_eq!(Ok(0), sut.allocate());
         assert_eq!(8191, sut.count_free_addresses());
@@ -184,7 +199,7 @@ mod test {
 
     #[test]
     fn release() {
-        let mut sut = FreeBlockAllocator::new();
+        let mut sut = DataAllocator::new();
         assert_eq!(Ok(8191), take_nth_blocks(&mut sut, 8192));
         assert_eq!(0, sut.count_free_addresses());
 
@@ -200,7 +215,7 @@ mod test {
 
     #[test]
     fn allocate_n() {
-        let mut sut = FreeBlockAllocator::new();
+        let mut sut = DataAllocator::new();
         assert_eq!(Ok(8191), take_nth_blocks(&mut sut, 8192));
         assert_eq!(0, sut.count_free_addresses());
 
@@ -231,7 +246,7 @@ mod test {
     #[test]
     fn write_and_read_to_device() {
         let mut out = MockDevice::new();
-        let mut sut = FreeBlockAllocator::new();
+        let mut sut = DataAllocator::new();
         assert_eq!(Ok(0), sut.allocate());
         assert_eq!(Ok(1), sut.allocate());
         assert_eq!(Ok(2), sut.allocate());
@@ -239,8 +254,8 @@ mod test {
 
         assert_eq!(Ok(()), sut.write_to_device(&mut out));
 
-        let loaded = FreeBlockAllocator::read_from_device(&mut out)
-            .expect("read from device should succeed");
+        let loaded =
+            DataAllocator::read_from_device(&mut out).expect("read from device should succeed");
 
         assert_eq!(sut.count_free_addresses(), loaded.count_free_addresses());
     }
