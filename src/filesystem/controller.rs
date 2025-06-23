@@ -2,8 +2,8 @@ use crate::{
     Addr, BlockDevice, Error,
     filesystem::{
         DataWriter, EraseFromDevice, File, FileHandle, FileName, FreeBlockAllocator,
-        MAX_FILENAME_LEN, MAX_FILES, Meta, Node, StaticReadFromDevice, WriteToDevice,
-        node_writer::NodeWriter,
+        MAX_FILENAME_LEN, MAX_FILES, Meta, Node, NodeHandle, NodeWriter, StaticReadFromDevice,
+        WriteToDevice,
     },
 };
 
@@ -82,7 +82,7 @@ where
     pub fn delete(&mut self, filename: &str) -> Result<(), Error> {
         if let Some((file, node)) = self.find_file(filename) {
             node.block_addrs().iter().for_each(|addr| self.allocator.release(*addr));
-            NodeWriter::new(file.addr(), &node).erase_from_device(&mut self.device)?;
+            NodeHandle::new(file.addr()).erase_from_device(&mut self.device)?;
             FileHandle::new(file.addr()).erase_from_device(&mut self.device)?;
             self.allocator.write_to_device(&mut self.device)?;
 

@@ -1,6 +1,6 @@
 use crate::{
     BlockDevice, Error,
-    filesystem::{Addr, Block, EraseFromDevice, Layout, Node, Serializable, WriteToDevice},
+    filesystem::{Addr, Block, Layout, Node, Serializable, WriteToDevice},
     io::Writer,
 };
 
@@ -36,19 +36,6 @@ where
         let mut writer = Writer::new(&mut block[offset..]);
         self.node.serialize(&mut writer)?;
 
-        out.write_block(sector, &block)
-    }
-}
-
-impl<D> EraseFromDevice<D> for NodeWriter<'_>
-where
-    D: BlockDevice,
-{
-    fn erase_from_device(&self, out: &mut D) -> Result<(), Error> {
-        let (sector, offset) = (self.sector(), self.byte_offset());
-        let mut block = Block::new();
-        out.read_block(sector, &mut block)?;
-        block[offset..offset + Node::SERIALIZED_LEN].fill(0);
         out.write_block(sector, &block)
     }
 }
@@ -99,14 +86,5 @@ mod test {
         assert_eq!(Ok(42), node.serialize(&mut writer));
 
         out.assert_write(0, Layout::NODE.nth(2), &expected_data);
-    }
-
-    #[test]
-    fn erase_from_device() {
-        let mut out = MockDevice::new();
-        let node = &Node::new(1024, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
-        let sut = NodeWriter::new(0, node);
-        assert_eq!(Ok(()), sut.erase_from_device(&mut out));
-        out.assert_write(0, Layout::NODE.nth(0), &[0u8; Block::LEN]);
     }
 }

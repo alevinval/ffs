@@ -9,6 +9,8 @@ use free::Free;
 use free_allocator::FreeBlockAllocator;
 use meta::Meta;
 use node::Node;
+use node_handle::NodeHandle;
+use node_writer::NodeWriter;
 use range::Range;
 
 use crate::{
@@ -26,6 +28,7 @@ mod free;
 mod free_allocator;
 mod meta;
 mod node;
+mod node_handle;
 mod node_writer;
 mod range;
 
