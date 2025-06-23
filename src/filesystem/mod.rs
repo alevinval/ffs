@@ -49,7 +49,8 @@ pub struct Layout {}
 /// offsets to logical addresses.
 impl Layout {
     pub const META: Range = Range::new(0, 1);
-    pub const FILE: Range = Self::META.next(MAX_FILES);
+    pub const TABLE: Range = Self::META.next(1);
+    pub const FILE: Range = Self::TABLE.next(MAX_FILES);
     pub const NODE: Range = Self::FILE.next(MAX_FILES);
     pub const FREE: Range = Self::NODE.next(MAX_DATA_BLOCKS / Free::SLOTS);
     pub const DATA: Range = Self::FREE.next(MAX_DATA_BLOCKS);
@@ -115,7 +116,8 @@ mod test {
 
     #[test]
     fn ranges_layout() {
-        assert_continuous_range(Layout::META, Layout::FILE);
+        assert_continuous_range(Layout::META, Layout::TABLE);
+        assert_continuous_range(Layout::TABLE, Layout::FILE);
         assert_continuous_range(Layout::FILE, Layout::NODE);
         assert_continuous_range(Layout::NODE, Layout::FREE);
         assert_continuous_range(Layout::FREE, Layout::DATA);
