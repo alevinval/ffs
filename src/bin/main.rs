@@ -6,7 +6,7 @@ where
 {
     println!("ls-files:");
 
-    let mut files = ctrl.iter_files().peekable();
+    let mut files = ctrl.entries().peekable();
 
     if files.peek().is_none() {
         println!("<empty>");
@@ -14,7 +14,7 @@ where
     }
 
     for f in files {
-        println!("- {}", f.name_str());
+        println!("- {}", f.name().as_str());
     }
 }
 
@@ -69,11 +69,10 @@ Ligula congue sollicitudin erat viverra ac tincidunt nam. Euismod quam justo lec
     ls_files(&ctrl);
 
     println!("Creating file...");
-    ctrl.create("lorem_ipsum.txt", data).expect("failed to create file");
+    let fname = "lorem_ipsum8.txt";
+    ctrl.create(fname, data).expect("failed to create file");
 
     ls_files(&ctrl);
-    let fname = "lorem_ipsum.txt";
-
     rm_file(&mut ctrl, fname);
     ls_files(&ctrl);
 

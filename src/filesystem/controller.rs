@@ -1,8 +1,9 @@
 use crate::{
-    Addr, BlockDevice, Error,
+    BlockDevice, Error,
     filesystem::{
-        DataAllocator, DataWriter, EraseFromDevice, File, FileHandle, FileName, MAX_FILENAME_LEN,
-        MAX_FILES, Meta, Node, NodeHandle, NodeWriter, StaticReadFromDevice, WriteToDevice,
+        DataAllocator, DataWriter, Directory, EntryIter, EraseFromDevice, File, FileHandle,
+        FileName, MAX_FILENAME_LEN, Meta, Node, NodeHandle, NodeWriter, ReadFromDevice,
+        StaticReadFromDevice, WriteToDevice,
     },
 };
 
@@ -11,10 +12,9 @@ pub struct Controller<D>
 where
     D: BlockDevice,
 {
-    entries: [Option<(File, Node)>; MAX_FILES],
-    data_allocator: DataAllocator,
-    file_count: Addr,
     device: D,
+    directory: Directory,
+    data_allocator: DataAllocator,
 }
 
 impl<D> Controller<D>
@@ -25,13 +25,9 @@ where
         if Meta::read_from_device(&mut device)? != Meta::new() {
             return Err(Error::Unsupported);
         }
-
-        Ok(Self {
-            entries: [const { None }; MAX_FILES],
-            data_allocator: DataAllocator::new(),
-            file_count: 0,
-            device,
-        })
+        let directory = Directory::read_from_device(&mut device)?;
+        let data_allocator = DataAllocator::read_from_device(&mut device)?;
+        Ok(Self { directory, data_allocator, device })
     }
 
     pub fn format(device: &mut D) -> Result<(), Error> {
@@ -53,37 +49,37 @@ where
             return Err(Error::FileNameTooLong);
         }
 
-        if self.file_count as usize > MAX_FILES {
-            return Err(Error::StorageFull);
+        if self.directory.file_exists(&file_name) {
+            return Err(Error::FileAlreadyExists);
         }
 
+        let entry = self.directory.add_file(file_name)?;
+        let file = File::new(file_name, entry.file_addr());
         let node = self.data_allocator.allocate_node_data(file_size)?;
-        let file = File::new(file_name, self.file_count);
-
-        file.write_to_device(&mut self.device)?;
+        DataWriter::new(node.block_addrs(), data).write(&mut self.device)?;
         NodeWriter::new(file.addr(), &node).write_to_device(&mut self.device)?;
-        DataWriter::new(node.block_addrs(), data)
-            .write(&mut self.device)
-            .expect("cannot write data");
-
+        file.write_to_device(&mut self.device)?;
+        self.directory.write_to_device(&mut self.device)?;
         self.data_allocator.write_to_device(&mut self.device)?;
-
-        let pos = self.file_count as usize;
-        self.entries[pos] = Some((file, node));
-        self.file_count += 1;
-
         Ok(())
     }
 
-    pub fn delete(&mut self, filename: &str) -> Result<(), Error> {
-        if let Some((file, node)) = self.find_file(filename) {
-            self.data_allocator.release_node_data(&node);
-            NodeHandle::new(file.addr()).erase_from_device(&mut self.device)?;
-            FileHandle::new(file.addr()).erase_from_device(&mut self.device)?;
-            self.data_allocator.write_to_device(&mut self.device)?;
+    pub fn delete(&mut self, file_name: &str) -> Result<(), Error> {
+        let file_name = FileName::new(file_name)?;
 
-            self.entries[file.addr() as usize] = None;
-            self.file_count -= 1;
+        if let Some(entry) = self.directory.find_file(&file_name) {
+            let node_handle = NodeHandle::new(entry.file_addr());
+            let file_handle = FileHandle::new(entry.file_addr());
+            let node = node_handle.read_from_device(&mut self.device)?;
+
+            node_handle.erase_from_device(&mut self.device)?;
+            file_handle.erase_from_device(&mut self.device)?;
+            self.directory.remove_file(&file_name)?;
+            self.directory.write_to_device(&mut self.device)?;
+
+            // Release data blocks only after metadata is fully erased.
+            self.data_allocator.release_node_data(&node);
+            self.data_allocator.write_to_device(&mut self.device)?;
 
             return Ok(());
         }
@@ -91,39 +87,11 @@ where
         Err(Error::FileNotFound)
     }
 
-    pub fn iter_files(&self) -> FileIter {
-        FileIter::new(&self.entries)
+    pub fn entries(&self) -> EntryIter {
+        self.directory.iter()
     }
 
     pub fn device(&mut self) -> &mut D {
         &mut self.device
-    }
-
-    fn find_file(&self, name: &str) -> Option<(File, Node)> {
-        let name = FileName::new(name).ok()?;
-        self.entries.iter().flatten().find(|(file, _)| file.name() == &name).cloned()
-    }
-}
-
-pub struct FileIter<'a> {
-    entries: &'a [Option<(File, Node)>],
-    pos: usize,
-}
-
-impl<'a> core::iter::Iterator for FileIter<'a> {
-    type Item = &'a File;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some((file, _)) = self.entries[self.pos..].iter().flatten().next() {
-            self.pos += 1;
-            return Some(file);
-        }
-        None
-    }
-}
-
-impl<'a> FileIter<'a> {
-    pub fn new(entries: &'a [Option<(File, Node)>]) -> Self {
-        Self { entries, pos: 0 }
     }
 }

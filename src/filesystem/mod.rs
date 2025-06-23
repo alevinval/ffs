@@ -3,6 +3,8 @@ pub use controller::Controller;
 
 use data_allocator::DataAllocator;
 use data_writer::DataWriter;
+use directory::Directory;
+use directory::EntryIter;
 use file::File;
 use file_handle::FileHandle;
 use file_name::FileName;
@@ -22,6 +24,7 @@ mod block;
 mod controller;
 mod data_allocator;
 mod data_writer;
+mod directory;
 mod file;
 mod file_handle;
 mod file_name;
@@ -49,7 +52,7 @@ pub struct Layout {}
 /// offsets to logical addresses.
 impl Layout {
     pub const META: Range = Range::new(0, 1);
-    pub const TABLE: Range = Self::META.next(1);
+    pub const TABLE: Range = Self::META.next(MAX_FILES / Directory::SLOTS);
     pub const FILE: Range = Self::TABLE.next(MAX_FILES);
     pub const NODE: Range = Self::FILE.next(MAX_FILES);
     pub const FREE: Range = Self::NODE.next(MAX_DATA_BLOCKS / Free::SLOTS);
