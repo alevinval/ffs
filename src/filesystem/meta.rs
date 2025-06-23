@@ -8,6 +8,7 @@ use crate::{
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct Meta {
+    table_sector: Addr,
     file_sector: Addr,
     node_sector: Addr,
     free_sector: Addr,
@@ -27,6 +28,7 @@ impl Meta {
 
     pub const fn new() -> Self {
         Meta {
+            table_sector: Layout::TABLE.begin(),
             file_sector: Layout::FILE.begin(),
             node_sector: Layout::NODE.begin(),
             free_sector: Layout::FREE.begin(),
@@ -39,12 +41,13 @@ impl Meta {
 
 impl Serializable for Meta {
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<usize, Error> {
-        let mut n = writer.write_u32(self.file_sector)?;
+        let mut n = writer.write_u32(self.table_sector)?;
+        n += writer.write_u32(self.file_sector)?;
         n += writer.write_u32(self.node_sector)?;
         n += writer.write_u32(self.free_sector)?;
         n += writer.write_u32(self.data_sector)?;
         n += writer.write_u16(self.block_size)?;
-        n += writer.write(&[0; 492])?;
+        n += writer.write(&[0; 488])?;
         n += writer.write(&Self::SIGNATURE)?;
         Ok(n)
     }
@@ -52,16 +55,25 @@ impl Serializable for Meta {
 
 impl Deserializable<Meta> for Meta {
     fn deserialize<R: Read>(reader: &mut R) -> Result<Meta, Error> {
+        let table_sector = reader.read_u32()?;
         let file_sector = reader.read_u32()?;
         let node_sector = reader.read_u32()?;
         let free_sector = reader.read_u32()?;
         let data_sector = reader.read_u32()?;
         let block_size = reader.read_u16()?;
-        reader.read(&mut [0; 492])?;
+        reader.read(&mut [0; 488])?;
         let mut signature = [0u8; 2];
         reader.read(&mut signature)?;
 
-        Ok(Meta { file_sector, node_sector, free_sector, data_sector, block_size, signature })
+        Ok(Meta {
+            table_sector,
+            file_sector,
+            node_sector,
+            free_sector,
+            data_sector,
+            block_size,
+            signature,
+        })
     }
 }
 

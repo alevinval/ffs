@@ -24,6 +24,8 @@ pub enum Error {
     FileNotFound,
     /// The file is too large to be stored.
     FileTooLarge,
+    /// The file already exists.
+    FileAlreadyExists,
     /// The file name is invalid (e.g., contains invalid UTF-8).
     InvalidFileName,
     /// The file system is full and cannot accommodate more files.

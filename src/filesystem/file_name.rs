@@ -14,7 +14,7 @@ use crate::{
     io::{Read, Write},
 };
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FileName {
     bytes: [u8; MAX_FILENAME_LEN],
     len: usize,

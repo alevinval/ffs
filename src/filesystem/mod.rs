@@ -2,17 +2,18 @@ pub use block::Block;
 pub use controller::Controller;
 
 use data_writer::DataWriter;
+use directory::DirectoryTable;
 use file::File;
 use file_name::FileName;
 use free::Free;
 use free_allocator::FreeBlockAllocator;
 use meta::Meta;
 use node::Node;
+use node_writer::NodeWriter;
 use range::Range;
 
 use crate::{
     Error,
-    filesystem::directory::DirectoryEntry,
     io::{Read, Write},
 };
 
@@ -47,8 +48,7 @@ pub struct Layout {}
 /// offsets to logical addresses.
 impl Layout {
     pub const META: Range = Range::new(0, 1);
-    pub const TABLE: Range =
-        Self::META.next(MAX_FILES / (Block::LEN / (DirectoryEntry::SERIALIZED_LEN)));
+    pub const TABLE: Range = Self::META.next(MAX_FILES / DirectoryTable::SLOTS);
     pub const FILE: Range = Self::TABLE.next(MAX_FILES);
     pub const NODE: Range = Self::FILE.next(MAX_FILES);
     pub const FREE: Range = Self::NODE.next(MAX_DATA_BLOCKS / Free::SLOTS);
