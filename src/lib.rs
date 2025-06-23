@@ -18,6 +18,8 @@ pub(crate) mod test_utils;
 pub enum Error {
     /// The provided buffer is too small for the expected data.
     BufferTooSmall { expected: usize, found: usize },
+    /// The file already exists.
+    FileAlreadyExists,
     /// The file name exceeds the maximum allowed length.
     FileNameTooLong,
     /// The file does not exist.
