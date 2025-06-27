@@ -52,7 +52,7 @@ pub struct Layout {}
 /// offsets to logical addresses.
 impl Layout {
     pub const META: Range = Range::new(0, 1);
-    pub const TABLE: Range = Self::META.next(MAX_FILES.div_ceil(Directory::SLOTS));
+    pub const TABLE: Range = Self::META.next(MAX_FILES);
     pub const FILE: Range = Self::TABLE.next(MAX_FILES);
     pub const NODE: Range = Self::FILE.next(MAX_FILES);
     pub const FREE: Range = Self::NODE.next(MAX_DATA_BLOCKS / Free::SLOTS);

@@ -25,9 +25,8 @@ where
         if Meta::read_from_device(&mut device)? != Meta::new() {
             return Err(Error::Unsupported);
         }
-        let directory = Directory::read_from_device(&mut device)?;
         let data_allocator = DataAllocator::read_from_device(&mut device)?;
-        Ok(Self { directory, data_allocator, device })
+        Ok(Self { directory: Directory {}, data_allocator, device })
     }
 
     pub fn unmount(self) -> D {
@@ -53,17 +52,17 @@ where
             return Err(Error::FileNameTooLong);
         }
 
-        if self.directory.file_exists(&file_name) {
+        if self.directory.file_exists(&mut self.device, &file_name) {
             return Err(Error::FileAlreadyExists);
         }
 
-        let entry = self.directory.add_file(file_name)?;
+        let entry = self.directory.add_file(&mut self.device, file_name)?;
         let file = File::new(file_name, entry.file_addr());
         let node = self.data_allocator.allocate_node_data(file_size)?;
         DataWriter::new(node.block_addrs(), data).write_to_device(&mut self.device)?;
         NodeWriter::new(file.addr(), &node).write_to_device(&mut self.device)?;
         file.write_to_device(&mut self.device)?;
-        self.directory.write_to_device(&mut self.device)?;
+        // self.directory.write_to_device(&mut self.device)?;
         self.data_allocator.write_to_device(&mut self.device)?;
         Ok(())
     }
@@ -71,28 +70,24 @@ where
     pub fn delete(&mut self, file_name: &str) -> Result<(), Error> {
         let file_name = FileName::new(file_name)?;
 
-        if let Some(entry) = self.directory.find_file(&file_name) {
-            let node_handle = NodeHandle::new(entry.file_addr());
-            let file_handle = FileHandle::new(entry.file_addr());
-            let node = node_handle.read_from_device(&mut self.device)?;
+        let entry = self.directory.find_file(&mut self.device, &file_name)?;
+        let node_handle = NodeHandle::new(entry.file_addr());
+        let file_handle = FileHandle::new(entry.file_addr());
+        let node = node_handle.read_from_device(&mut self.device)?;
 
-            node_handle.erase_from_device(&mut self.device)?;
-            file_handle.erase_from_device(&mut self.device)?;
-            self.directory.remove_file(&file_name)?;
-            self.directory.write_to_device(&mut self.device)?;
+        node_handle.erase_from_device(&mut self.device)?;
+        file_handle.erase_from_device(&mut self.device)?;
+        self.directory.remove_file(&mut self.device, &file_name)?;
+        // self.directory.write_to_device(&mut self.device)?;
 
-            // Release data blocks only after metadata is fully erased.
-            self.data_allocator.release_node_data(&node);
-            self.data_allocator.write_to_device(&mut self.device)?;
-
-            return Ok(());
-        }
-
-        Err(Error::FileNotFound)
+        // Release data blocks only after metadata is fully erased.
+        self.data_allocator.release_node_data(&node);
+        self.data_allocator.write_to_device(&mut self.device)?;
+        Ok(())
     }
 
-    pub fn entries(&self) -> EntryIter {
-        self.directory.iter()
+    pub fn entries(&mut self) -> EntryIter<D> {
+        self.directory.iter(&mut self.device)
     }
 
     pub fn device(&mut self) -> &mut D {
