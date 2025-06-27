@@ -22,9 +22,9 @@ fn rm_file<D>(ctrl: &mut Controller<D>, fname: &str)
 where
     D: BlockDevice,
 {
-    println!("rm {}", fname);
+    println!("rm {fname}");
     ctrl.delete(fname).expect("failed");
-    println!("deleted file {}", fname);
+    println!("deleted file {fname}");
 }
 
 fn main() {

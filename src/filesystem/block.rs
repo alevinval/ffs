@@ -54,7 +54,7 @@ impl core::fmt::Debug for Block {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str("[block]\n")?;
         for (i, byte) in self.inner.iter().enumerate() {
-            f.write_fmt(format_args!(" {:02X}", byte))?;
+            f.write_fmt(format_args!(" {byte:02X}"))?;
             if (i + 1) % 32 == 0 {
                 f.write_str("\n")?;
             }

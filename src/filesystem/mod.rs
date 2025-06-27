@@ -114,7 +114,7 @@ mod test {
     use super::*;
 
     fn assert_continuous_range(a: Range, b: Range) {
-        assert!(a.end() == b.begin(), "range {:?} does not end where {:?} begins", a, b);
+        assert!(a.end() == b.begin(), "range {a:?} does not end where {b:?} begins");
     }
 
     #[test]

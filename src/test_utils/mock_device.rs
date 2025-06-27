@@ -20,8 +20,8 @@ impl MockDevice {
 
     pub fn assert_write(&self, n: usize, sector: Addr, data: &[u8]) {
         let write = &self.writes[n];
-        assert_eq!(sector, write.0, "sector missmatch on write {}", n);
-        assert_eq!(data, &write.1, "data missmatch on write {}", n);
+        assert_eq!(sector, write.0, "sector missmatch on write {n}");
+        assert_eq!(data, &write.1, "data missmatch on write {n}");
     }
 }
 

@@ -15,6 +15,5 @@ path = "src/lib.rs"
 [[bin]]
 name = "ffs"
 path = "src/bin/main.rs"
-features = ["std"]
 
 [dependencies]
