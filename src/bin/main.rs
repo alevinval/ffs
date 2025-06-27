@@ -1,6 +1,6 @@
 use ffs::{BlockDevice, Controller, disk::MemoryDisk};
 
-fn ls_files<D>(ctrl: &Controller<D>)
+fn ls_files<D>(ctrl: &mut Controller<D>)
 where
     D: BlockDevice,
 {
@@ -66,15 +66,15 @@ Ligula congue sollicitudin erat viverra ac tincidunt nam. Euismod quam justo lec
     let mut ctrl = Controller::mount(sdcard).expect("failed to read metadata");
 
     println!("Controller initialized");
-    ls_files(&ctrl);
+    ls_files(&mut ctrl);
 
     println!("Creating file...");
     let fname = "lorem_ipsum8.txt";
     ctrl.create(fname, data).expect("failed to create file");
 
-    ls_files(&ctrl);
+    ls_files(&mut ctrl);
     rm_file(&mut ctrl, fname);
-    ls_files(&ctrl);
+    ls_files(&mut ctrl);
 
     ctrl.device().persist_to_file("sdcard.img").expect("Failed to persist SD card image");
 }

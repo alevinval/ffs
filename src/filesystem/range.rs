@@ -36,6 +36,7 @@ impl Range {
         0..self.len() as usize
     }
 
+    #[cfg(test)]
     pub const fn iter_sectors(&self) -> core::ops::Range<Addr> {
         self.begin()..self.end()
     }
