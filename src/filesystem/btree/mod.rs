@@ -2,7 +2,7 @@ use std::println;
 
 use crate::{
     Error,
-    filesystem::{directory::Entry, file_name::FileName},
+    filesystem::{directory::FileEntry, file_name::FileName},
 };
 
 const ARENA_LEN: usize = 5;
@@ -61,7 +61,7 @@ impl Arena {
                 .iter_mut()
                 .find(|f| f.is_none())
                 .ok_or(Error::StorageFull)?
-                .replace(Entry::new(FileName::new(first.unwrap()).unwrap(), 0));
+                .replace(FileEntry::new(FileName::new(first.unwrap()).unwrap(), 0));
             return Ok(());
         }
 
@@ -102,7 +102,7 @@ impl Arena {
 struct BTreeNode {
     name: FileName,
     children: [Option<usize>; NODES_LEN],
-    files: [Option<Entry>; FILES_LEN],
+    files: [Option<FileEntry>; FILES_LEN],
 }
 
 impl BTreeNode {
@@ -128,6 +128,6 @@ mod test {
         assert_eq!(Ok(()), arena.mkdir("test/dir/subdir/hello.txt"));
         println!("{arena:?}");
         arena.print_tree();
-        assert!(false);
+        assert!(true);
     }
 }

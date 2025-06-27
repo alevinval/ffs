@@ -2,24 +2,24 @@ use crate::{
     Addr, BlockDevice, Error,
     filesystem::{
         Block, Deserializable, FileName, Layout, MAX_FILES, SerdeLen, Serializable,
-        StaticReadFromDevice, WriteToDevice, directory::Entry,
+        StaticReadFromDevice, WriteToDevice, directory::FileEntry,
     },
 };
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Directory {
-    entries: [Entry; Self::LEN],
+    entries: [FileEntry; Self::LEN],
 }
 
 impl Directory {
-    pub const SLOTS: usize = Block::LEN / Entry::SERDE_LEN;
+    pub const SLOTS: usize = Block::LEN / FileEntry::SERDE_LEN;
 
     const LEN: usize = MAX_FILES;
 
     pub fn new() -> Self {
-        Self { entries: [const { Entry::empty() }; Self::LEN] }
+        Self { entries: [const { FileEntry::empty() }; Self::LEN] }
     }
-    pub fn add_file(&mut self, file_name: FileName) -> Result<&Entry, Error> {
+    pub fn add_file(&mut self, file_name: FileName) -> Result<&FileEntry, Error> {
         for (addr, entry) in self.entries.iter_mut().enumerate() {
             if !entry.is_valid() {
                 entry.update(file_name, addr as Addr);
@@ -32,22 +32,22 @@ impl Directory {
     pub fn remove_file(&mut self, file_name: &FileName) -> Result<(), Error> {
         for entry in self.entries.iter_mut() {
             if entry.is_valid() && entry.name() == file_name {
-                *entry = Entry::default();
+                *entry = FileEntry::default();
                 return Ok(());
             }
         }
         Err(Error::FileNotFound)
     }
 
-    pub fn find_file(&self, file_name: &FileName) -> Option<&Entry> {
+    pub fn find_file(&self, file_name: &FileName) -> Option<&FileEntry> {
         self.entries.iter().find(|e| e.is_valid() && e.name() == file_name)
     }
 
-    pub fn find_file_mut(&mut self, file_name: &FileName) -> Option<&mut Entry> {
+    pub fn find_file_mut(&mut self, file_name: &FileName) -> Option<&mut FileEntry> {
         self.entries.iter_mut().find(|e| e.is_valid() && e.name() == file_name)
     }
 
-    pub fn list_files(&self) -> impl Iterator<Item = &Entry> {
+    pub fn list_files(&self) -> impl Iterator<Item = &FileEntry> {
         self.entries.iter().filter(|e| e.is_valid())
     }
 
@@ -111,7 +111,7 @@ where
                 if n >= Self::LEN {
                     break;
                 }
-                table.entries[n] = Entry::deserialize(&mut reader)?;
+                table.entries[n] = FileEntry::deserialize(&mut reader)?;
                 n += 1;
             }
         }
@@ -120,12 +120,12 @@ where
 }
 
 pub struct EntryIter<'a> {
-    entries: &'a [Entry],
+    entries: &'a [FileEntry],
     pos: usize,
 }
 
 impl<'a> core::iter::Iterator for EntryIter<'a> {
-    type Item = &'a Entry;
+    type Item = &'a FileEntry;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(entry) = self.entries[self.pos..].iter().find(|entry| entry.is_valid()) {
@@ -137,7 +137,7 @@ impl<'a> core::iter::Iterator for EntryIter<'a> {
 }
 
 impl<'a> EntryIter<'a> {
-    pub fn new(entries: &'a [Entry]) -> Self {
+    pub fn new(entries: &'a [FileEntry]) -> Self {
         Self { entries, pos: 0 }
     }
 }
