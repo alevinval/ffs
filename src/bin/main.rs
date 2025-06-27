@@ -63,7 +63,7 @@ Ligula congue sollicitudin erat viverra ac tincidunt nam. Euismod quam justo lec
         }
     };
 
-    let mut ctrl = Controller::from(sdcard).expect("failed to read metadata");
+    let mut ctrl = Controller::mount(sdcard).expect("failed to read metadata");
 
     println!("Controller initialized");
     ls_files(&ctrl);

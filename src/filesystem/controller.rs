@@ -21,13 +21,17 @@ impl<D> Controller<D>
 where
     D: BlockDevice,
 {
-    pub fn from(mut device: D) -> Result<Controller<D>, Error> {
+    pub fn mount(mut device: D) -> Result<Controller<D>, Error> {
         if Meta::read_from_device(&mut device)? != Meta::new() {
             return Err(Error::Unsupported);
         }
         let directory = Directory::read_from_device(&mut device)?;
         let data_allocator = DataAllocator::read_from_device(&mut device)?;
         Ok(Self { directory, data_allocator, device })
+    }
+
+    pub fn unmount(self) -> D {
+        self.device
     }
 
     pub fn format(device: &mut D) -> Result<(), Error> {
