@@ -5,6 +5,7 @@
 //! [`FileName`] to ensure that file names are always valid and conform to the
 //! maximum length constraint.
 
+use core::ops::Add;
 #[cfg(test)]
 use std::string::String;
 
@@ -58,6 +59,23 @@ impl FileName {
     /// Creates a new empty buffer to store a file name.
     const fn buffer() -> [u8; MAX_FILENAME_LEN] {
         [0u8; MAX_FILENAME_LEN]
+    }
+}
+
+impl Add for FileName {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self::Output {
+        if self.len + other.len > MAX_FILENAME_LEN {
+            panic!("filename addition exceeds maximum filename length");
+        }
+
+        let mut bytes = [0u8; MAX_FILENAME_LEN];
+        let len = self.len + other.len;
+        bytes[..self.len].copy_from_slice(&self.bytes[..self.len]);
+        bytes[self.len..len].copy_from_slice(&other.bytes[..other.len]);
+
+        Self { bytes, len }
     }
 }
 

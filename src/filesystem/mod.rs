@@ -21,6 +21,7 @@ use crate::{
 };
 
 mod block;
+mod btree;
 mod controller;
 mod data_allocator;
 mod data_writer;
@@ -44,7 +45,7 @@ const MAX_FILES: usize = 1024;
 const MAX_DATA_BLOCKS: usize = Node::BLOCKS_PER_NODE * MAX_FILES;
 
 /// Maximum length of a file name in bytes.
-const MAX_FILENAME_LEN: usize = 128;
+const MAX_FILENAME_LEN: usize = 26;
 
 pub struct Layout {}
 
