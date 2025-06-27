@@ -1,6 +1,6 @@
 use crate::{
     Addr, Error,
-    filesystem::{Deserializable, FileName, Serializable},
+    filesystem::{Deserializable, FileName, SerdeLen, Serializable},
     io::{Read, Write},
 };
 
@@ -12,8 +12,6 @@ pub struct Entry {
 }
 
 impl Entry {
-    pub const SERIALIZED_LEN: usize = 134;
-
     pub const fn empty() -> Self {
         Self { file_name: FileName::empty(), file_addr: 0, is_valid: false }
     }
@@ -59,6 +57,10 @@ impl Default for Entry {
     }
 }
 
+impl SerdeLen for Entry {
+    const SERDE_LEN: usize = FileName::SERDE_LEN + 5;
+}
+
 impl Serializable for Entry {
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<usize, Error> {
         let mut n = self.file_name.serialize(writer)?;
@@ -89,7 +91,7 @@ mod test {
         let mut block = Block::new();
 
         let expected = Entry::new("test_file".into(), 1);
-        assert_eq!(Ok(Entry::SERIALIZED_LEN), expected.serialize(&mut block.writer()));
+        assert_eq!(Ok(Entry::SERDE_LEN), expected.serialize(&mut block.writer()));
         let actual = Entry::deserialize(&mut block.reader()).unwrap();
 
         assert_eq!(expected, actual);

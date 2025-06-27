@@ -1,6 +1,6 @@
 use crate::{
     Error,
-    filesystem::{Addr, Block, Deserializable, Serializable},
+    filesystem::{Addr, Block, Deserializable, SerdeLen, Serializable},
     io::{Read, Write},
 };
 
@@ -70,6 +70,10 @@ impl Free {
             self.last_free = pos;
         }
     }
+}
+
+impl SerdeLen for Free {
+    const SERDE_LEN: usize = Block::LEN;
 }
 
 impl Serializable for Free {
@@ -152,9 +156,9 @@ mod test {
         take_nth_blocks(&mut expected, 2048);
 
         let mut block = Block::new();
-        expected.serialize(&mut block.writer()).expect("should serialize");
+        assert_eq!(Ok(Free::SERDE_LEN), expected.serialize(&mut block.writer()));
+        let actual = Free::deserialize(&mut block.reader()).unwrap();
 
-        let actual = Free::deserialize(&mut block.reader()).expect("should deserialize");
         assert_eq!(expected.inner, actual.inner);
     }
 }

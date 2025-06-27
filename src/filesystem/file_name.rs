@@ -10,7 +10,7 @@ use std::string::String;
 
 use crate::{
     Error,
-    filesystem::{Deserializable, MAX_FILENAME_LEN, Serializable},
+    filesystem::{Deserializable, MAX_FILENAME_LEN, SerdeLen, Serializable},
     io::{Read, Write},
 };
 
@@ -61,6 +61,10 @@ impl FileName {
     }
 }
 
+impl SerdeLen for FileName {
+    const SERDE_LEN: usize = MAX_FILENAME_LEN + 1;
+}
+
 impl Serializable for FileName {
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<usize, Error> {
         let mut n = writer.write_u8(self.len as u8)?;
@@ -98,7 +102,20 @@ impl From<String> for FileName {
 
 #[cfg(test)]
 mod tests {
+    use crate::filesystem::Block;
+
     use super::*;
+
+    #[test]
+    fn serde_symmetry() {
+        let mut block = Block::new();
+
+        let expected = FileName::new("test_file").unwrap();
+        assert_eq!(Ok(FileName::SERDE_LEN), expected.serialize(&mut block.writer()));
+        let actual = FileName::deserialize(&mut block.reader()).unwrap();
+
+        assert_eq!(expected, actual);
+    }
 
     #[test]
     fn short_length() {

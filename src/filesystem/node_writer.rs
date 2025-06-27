@@ -1,6 +1,6 @@
 use crate::{
     BlockDevice, Error,
-    filesystem::{Addr, Block, Layout, Node, Serializable, WriteToDevice},
+    filesystem::{Addr, Block, Layout, Node, SerdeLen, Serializable, WriteToDevice},
     io::Writer,
 };
 
@@ -15,7 +15,7 @@ impl<'a> NodeWriter<'a> {
     }
 
     const fn byte_offset(&self) -> usize {
-        (self.addr as usize % Node::NODES_PER_BLOCK) * Node::SERIALIZED_LEN
+        (self.addr as usize % Node::NODES_PER_BLOCK) * Node::SERDE_LEN
     }
 
     const fn sector(&self) -> Addr {
@@ -82,7 +82,7 @@ mod test {
         assert_eq!(Ok(()), sut.write_to_device(&mut out));
 
         let mut expected_data = [0u8; Block::LEN];
-        let mut writer = Writer::new(&mut expected_data[2 * Node::SERIALIZED_LEN..]);
+        let mut writer = Writer::new(&mut expected_data[2 * Node::SERDE_LEN..]);
         assert_eq!(Ok(42), node.serialize(&mut writer));
 
         out.assert_write(0, Layout::NODE.nth(2), &expected_data);

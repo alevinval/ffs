@@ -59,6 +59,11 @@ impl Layout {
     pub const DATA: Range = Self::FREE.next(MAX_DATA_BLOCKS);
 }
 
+/// Trait for types that have a constant length when serialized/deserialized.
+trait SerdeLen {
+    const SERDE_LEN: usize;
+}
+
 trait Serializable {
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<usize, Error>;
 }

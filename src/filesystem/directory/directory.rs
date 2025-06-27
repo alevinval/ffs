@@ -1,8 +1,8 @@
 use crate::{
     Addr, BlockDevice, Error,
     filesystem::{
-        Block, Deserializable, FileName, Layout, MAX_FILES, Serializable, StaticReadFromDevice,
-        WriteToDevice, directory::Entry,
+        Block, Deserializable, FileName, Layout, MAX_FILES, SerdeLen, Serializable,
+        StaticReadFromDevice, WriteToDevice, directory::Entry,
     },
 };
 
@@ -12,7 +12,7 @@ pub struct Directory {
 }
 
 impl Directory {
-    pub const SLOTS: usize = Block::LEN / Entry::SERIALIZED_LEN;
+    pub const SLOTS: usize = Block::LEN / Entry::SERDE_LEN;
 
     const LEN: usize = MAX_FILES;
 

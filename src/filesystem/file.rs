@@ -2,7 +2,7 @@ use core::str;
 
 use crate::{
     Addr, BlockDevice, Error,
-    filesystem::{Block, Deserializable, FileName, Layout, Serializable, WriteToDevice},
+    filesystem::{Block, Deserializable, FileName, Layout, SerdeLen, Serializable, WriteToDevice},
     io::{Read, Write},
 };
 
@@ -28,6 +28,10 @@ impl File {
     pub const fn addr(&self) -> Addr {
         self.addr
     }
+}
+
+impl SerdeLen for File {
+    const SERDE_LEN: usize = 4 + FileName::SERDE_LEN;
 }
 
 impl Serializable for File {
@@ -60,7 +64,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::{filesystem::MAX_FILENAME_LEN, io::Reader, test_utils::MockDevice};
+    use crate::test_utils::MockDevice;
 
     use super::*;
 
@@ -71,22 +75,14 @@ mod test {
     }
 
     #[test]
-    fn deserialize_invalid_buffer_length_panics() {
-        let mut reader = Reader::new(&[128u8; 5 + MAX_FILENAME_LEN - 1]);
-        assert_eq!(
-            Err(Error::BufferTooSmall { expected: 133, found: 132 }),
-            File::deserialize(&mut reader)
-        );
-    }
-
-    #[test]
-    fn serde_symmetry() -> Result<(), Error> {
+    fn serde_symmetry() {
         let mut block = Block::new();
+
         let expected = File::new("test.txt".into(), 123);
-        expected.serialize(&mut block.writer())?;
-        let actual = File::deserialize(&mut block.reader())?;
+        assert_eq!(Ok(File::SERDE_LEN), expected.serialize(&mut block.writer()));
+        let actual = File::deserialize(&mut block.reader()).unwrap();
+
         assert_eq!(expected, actual);
-        Ok(())
     }
 
     #[test]

@@ -1,12 +1,13 @@
 use crate::{
     Addr, BlockDevice, Error,
     filesystem::{
-        Block, EraseFromDevice, Layout, ReadFromDevice, node::Node, node_writer::NodeWriter,
+        Block, EraseFromDevice, Layout, ReadFromDevice, SerdeLen, node::Node,
+        node_writer::NodeWriter,
     },
 };
 
 const fn byte_offset(addr: Addr) -> usize {
-    (addr as usize % Node::NODES_PER_BLOCK) * Node::SERIALIZED_LEN
+    (addr as usize % Node::NODES_PER_BLOCK) * Node::SERDE_LEN
 }
 
 const fn sector(addr: Addr) -> Addr {
@@ -49,7 +50,7 @@ where
         let (sector, offset) = (sector(self.addr), byte_offset(self.addr));
         let mut block = Block::new();
         out.read_block(sector, &mut block)?;
-        block[offset..offset + Node::SERIALIZED_LEN].fill(0);
+        block[offset..offset + Node::SERDE_LEN].fill(0);
         out.write_block(sector, &block)
     }
 }

@@ -1,7 +1,7 @@
 use crate::{
     filesystem::{
-        Addr, Block, BlockDevice, Deserializable, EraseFromDevice, Error, Layout, Serializable,
-        StaticReadFromDevice, WriteToDevice,
+        Addr, Block, BlockDevice, Deserializable, EraseFromDevice, Error, Layout, SerdeLen,
+        Serializable, StaticReadFromDevice, WriteToDevice,
     },
     io::{Read, Write},
 };
@@ -37,6 +37,10 @@ impl Meta {
             signature: Self::SIGNATURE,
         }
     }
+}
+
+impl SerdeLen for Meta {
+    const SERDE_LEN: usize = Block::LEN;
 }
 
 impl Serializable for Meta {
@@ -119,15 +123,14 @@ mod test {
     use super::*;
 
     #[test]
-    fn serde_symmetry() -> Result<(), Error> {
+    fn serde_symmetry() {
         let mut block = Block::new();
 
         let expected = Meta::new();
-        expected.serialize(&mut block.writer())?;
-        let actual = Meta::deserialize(&mut block.reader())?;
-        assert_eq!(expected, actual);
+        assert_eq!(Ok(Meta::SERDE_LEN), expected.serialize(&mut block.writer()));
+        let actual = Meta::deserialize(&mut block.reader()).unwrap();
 
-        Ok(())
+        assert_eq!(expected, actual);
     }
 
     #[test]
