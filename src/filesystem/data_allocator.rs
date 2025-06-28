@@ -1,55 +1,64 @@
 use crate::{
     BlockDevice, Error,
-    filesystem::{
-        Addr, Block, Deserializable, Free, Layout, Node, Serializable, StaticReadFromDevice,
-        WriteToDevice,
-    },
+    filesystem::{Addr, Block, Deserializable, Free, Node, Serializable, range::Range},
 };
 
 #[derive(Debug)]
 pub(crate) struct DataAllocator {
-    inner: [Free; Self::LEN],
-    dirty: [bool; Self::LEN],
-    last_pos: usize,
-}
-
-impl Default for DataAllocator {
-    fn default() -> Self {
-        Self::new()
-    }
+    range: Range,
+    last_accessed: Addr,
 }
 
 impl DataAllocator {
-    pub const LEN: usize = Layout::FREE.len() as usize;
-
-    /// Returns a [`DataAllocator`] instance with all addresses marked as free.
-    pub const fn new() -> Self {
-        Self { inner: [const { Free::new() }; Self::LEN], dirty: [false; Self::LEN], last_pos: 0 }
+    pub const fn new(range: Range) -> Self {
+        Self { last_accessed: 0, range }
     }
 
     /// Attempts to allocate enough blocks to fit `file_size` bytes and returns a [`Node`] instance
     /// with all the allocated addresses.
-    pub fn allocate_node_data(&mut self, file_size: usize) -> Result<Node, Error> {
+    pub fn allocate_node_data<D: BlockDevice>(
+        &mut self,
+        device: &mut D,
+        file_size: usize,
+    ) -> Result<Node, Error> {
         let mut block_addrs = [0; Node::BLOCKS_PER_NODE];
-        self.allocate_bytes(file_size, &mut block_addrs)?;
+        self.allocate_bytes(device, file_size, &mut block_addrs)?;
         Ok(Node::new(file_size as u16, block_addrs))
     }
 
     /// Releases all blocks associated with the given [`Node`].
-    pub fn release_node_data(&mut self, node: &Node) {
+    pub fn release_node_data<D: BlockDevice>(
+        &mut self,
+        device: &mut D,
+        node: &Node,
+    ) -> Result<(), Error> {
         for addr in node.block_addrs() {
-            self.release(*addr);
+            self.release(device, *addr)?;
         }
+        Ok(())
     }
 
     #[cfg(test)]
-    fn count_free_addresses(&self) -> Addr {
-        self.inner.iter().map(|f| f.count_free_addresses()).sum()
+    fn count_free_addresses<D: BlockDevice>(&self, device: &mut D) -> Result<Addr, Error> {
+        let mut block = Block::new();
+        let mut total = 0;
+
+        for sector in self.range.iter_sectors() {
+            device.read_block(sector, &mut block)?;
+            let free = Free::deserialize(&mut block.reader())?;
+            total += free.count_free_addresses();
+        }
+        Ok(total)
     }
 
     /// Attempts to allocate enough blocks to fit `file_size` bytes.
-    fn allocate_bytes(&mut self, file_size: usize, out: &mut [Addr]) -> Result<(), Error> {
-        self.allocate_n(file_size / Block::LEN, out)
+    fn allocate_bytes<D: BlockDevice>(
+        &mut self,
+        device: &mut D,
+        file_size: usize,
+        out: &mut [Addr],
+    ) -> Result<(), Error> {
+        self.allocate_n(device, file_size / Block::LEN, out)
     }
 
     /// Attempts to allocate `n` blocks and stores the allocated indices in the provided `buffer`.
@@ -64,21 +73,26 @@ impl DataAllocator {
     /// - `Err(Error::StorageFull)` if fewer than `n` blocks could be allocated. In this case,
     ///   allocated blocks will be automatically released.
     ///
-    fn allocate_n(&mut self, n: usize, out: &mut [Addr]) -> Result<(), Error> {
+    fn allocate_n<D: BlockDevice>(
+        &mut self,
+        device: &mut D,
+        n: usize,
+        out: &mut [Addr],
+    ) -> Result<(), Error> {
         if out.len() < n {
             return Err(Error::BufferTooSmall { expected: n, found: out.len() });
         }
 
         let mut count = 0;
         while count < n {
-            match self.allocate() {
+            match self.allocate(device) {
                 Ok(addr) => {
                     out[count] = addr;
                     count += 1;
                 }
                 Err(_) => {
                     for addr in out.iter().take(count) {
-                        self.release(*addr);
+                        self.release(device, *addr)?;
                     }
                     return Err(Error::StorageFull);
                 }
@@ -94,20 +108,24 @@ impl DataAllocator {
     /// - `Err(Error::StorageFull)` if no free blocks are available.
     ///
     /// # Notes
-    /// - Uses a circular scan starting from `self.last_pos` for improved allocation locality.
-    /// - Updates `self.last_pos` to the most recent allocation position to avoid always starting from 0.
-    fn allocate(&mut self) -> Result<Addr, Error> {
-        let len = self.inner.len();
+    /// - Uses a circular scan starting from `self.last_accessed` for improved allocation locality.
+    /// - Updates `self.last_accessed` to the most recent allocation position to avoid always starting from 0.
+    fn allocate<D: BlockDevice>(&mut self, device: &mut D) -> Result<Addr, Error> {
+        let mut block = Block::new();
 
-        for i in 0..len {
-            let pos = (self.last_pos + i) % len;
-            if let Some(addr) = self.inner[pos].allocate() {
-                self.dirty[pos] = true;
-                self.last_pos = pos;
-                return Ok(addr + pos_to_addr(pos));
+        for i in self.range.iter() {
+            let logical_addr = (self.last_accessed + i as Addr) % self.range.len();
+            let sector = self.range.nth(logical_addr);
+            device.read_block(sector, &mut block)?;
+            let mut free = Free::deserialize(&mut block.reader())?;
+
+            if let Some(allocation) = free.allocate() {
+                free.serialize(&mut block.writer())?;
+                device.write_block(sector, &block)?;
+                self.last_accessed = logical_addr;
+                return Ok(to_data_sector(logical_addr, allocation));
             }
         }
-
         Err(Error::StorageFull)
     }
 
@@ -118,146 +136,121 @@ impl DataAllocator {
     ///
     /// # Notes
     /// - Safe to call multiple times on the same address, though redundant calls may have no effect.
-    /// - May adjust `self.last_pos` to improve future allocation locality.
-    const fn release(&mut self, addr: Addr) {
-        let pos = addr_to_pos(addr);
-        self.inner[pos].release(addr_to_offset(addr));
-        self.dirty[pos] = true;
-        if pos < self.last_pos {
-            self.last_pos = pos;
-        }
-    }
-}
+    /// - May adjust `self.last_accessed` to improve future allocation locality.
+    fn release<D: BlockDevice>(&mut self, device: &mut D, data_sector: Addr) -> Result<(), Error> {
+        let logical_addr = to_free_logical(data_sector) as Addr;
+        let free_sector = self.range.nth(logical_addr);
+        let offset = to_allocated_offset(data_sector);
 
-impl<D> WriteToDevice<D> for DataAllocator
-where
-    D: BlockDevice,
-{
-    fn write_to_device(&self, out: &mut D) -> Result<(), Error> {
         let mut block = Block::new();
-        for (pos, free) in self.inner.iter().enumerate().filter(|(pos, _)| self.dirty[*pos]) {
-            free.serialize(&mut block.writer())?;
-            out.write_block(Layout::FREE.nth(pos as u32), &block)?;
-        }
+        device.read_block(free_sector, &mut block)?;
+        let mut free = Free::deserialize(&mut block.reader())?;
 
+        free.release(offset);
+        free.serialize(&mut block.writer())?;
+        device.write_block(free_sector, &block)?;
+        if logical_addr < self.last_accessed {
+            self.last_accessed = logical_addr;
+        }
         Ok(())
     }
 }
 
-impl<D> StaticReadFromDevice<D> for DataAllocator
-where
-    D: BlockDevice,
-{
-    type Item = Self;
-
-    fn read_from_device(device: &mut D) -> Result<Self, Error> {
-        let mut allocator = Self::new();
-        for i in 0..Self::LEN {
-            let mut block = Block::new();
-            device.read_block(Layout::FREE.nth(i as u32), &mut block)?;
-            allocator.inner[i] = Free::deserialize(&mut block.reader())?;
-        }
-        Ok(allocator)
-    }
-}
-
-const fn addr_to_offset(addr: Addr) -> u32 {
+const fn to_allocated_offset(addr: Addr) -> u32 {
     addr % Free::SLOTS as u32
 }
 
-const fn addr_to_pos(addr: Addr) -> usize {
+const fn to_free_logical(addr: Addr) -> usize {
     addr as usize / Free::SLOTS
 }
 
-const fn pos_to_addr(pos: usize) -> Addr {
-    (pos * Free::SLOTS) as Addr
+const fn to_data_sector(free_sector: Addr, allocation: Addr) -> Addr {
+    free_sector * Free::SLOTS as Addr + allocation
 }
 
 #[cfg(test)]
 mod test {
-    use crate::test_utils::MockDevice;
+    use crate::disk::MemoryDisk;
 
     use super::*;
 
-    fn take_nth_blocks(sut: &mut DataAllocator, n: usize) -> Result<Addr, Error> {
+    const RANGE: Range = Range::new(0, 2);
+
+    fn get_sut() -> (MemoryDisk, DataAllocator) {
+        let device = MemoryDisk::fit(RANGE.len());
+        let sut = DataAllocator::new(RANGE);
+        (device, sut)
+    }
+
+    fn take_nth_blocks<D: BlockDevice>(
+        sut: &mut DataAllocator,
+        device: &mut D,
+        n: usize,
+    ) -> Result<Addr, Error> {
         let mut last = Ok(0);
         for _ in 0..n {
-            last = sut.allocate();
+            last = sut.allocate(device);
         }
         last
     }
 
     #[test]
     fn allocate() {
-        let mut sut = DataAllocator::new();
-        assert_eq!(8192, sut.count_free_addresses());
-        assert_eq!(Ok(0), sut.allocate());
-        assert_eq!(8191, sut.count_free_addresses());
+        let (mut device, mut sut) = get_sut();
 
-        assert_eq!(Ok(8191), take_nth_blocks(&mut sut, 8191));
-        assert_eq!(0, sut.count_free_addresses());
+        assert_eq!(Ok(8192), sut.count_free_addresses(&mut device));
+        assert_eq!(Ok(0), sut.allocate(&mut device));
+        assert_eq!(Ok(8191), sut.count_free_addresses(&mut device));
+
+        assert_eq!(Ok(8191), take_nth_blocks(&mut sut, &mut device, 8191));
+        assert_eq!(Ok(0), sut.count_free_addresses(&mut device));
     }
 
     #[test]
     fn release() {
-        let mut sut = DataAllocator::new();
-        assert_eq!(Ok(8191), take_nth_blocks(&mut sut, 8192));
-        assert_eq!(0, sut.count_free_addresses());
+        let (mut device, mut sut) = get_sut();
 
-        sut.release(4000);
-        sut.release(5000);
-        sut.release(6000);
-        assert_eq!(3, sut.count_free_addresses());
+        assert_eq!(Ok(8191), take_nth_blocks(&mut sut, &mut device, 8192));
+        assert_eq!(Ok(0), sut.count_free_addresses(&mut device));
 
-        assert_eq!(Ok(4000), sut.allocate());
-        assert_eq!(Ok(5000), sut.allocate());
-        assert_eq!(Ok(6000), sut.allocate());
+        assert_eq!(Ok(()), sut.release(&mut device, 4000));
+        assert_eq!(Ok(()), sut.release(&mut device, 5000));
+        assert_eq!(Ok(()), sut.release(&mut device, 6000));
+        assert_eq!(Ok(3), sut.count_free_addresses(&mut device));
+
+        assert_eq!(Ok(4000), sut.allocate(&mut device));
+        assert_eq!(Ok(5000), sut.allocate(&mut device));
+        assert_eq!(Ok(6000), sut.allocate(&mut device));
     }
 
     #[test]
     fn allocate_n() {
-        let mut sut = DataAllocator::new();
-        assert_eq!(Ok(8191), take_nth_blocks(&mut sut, 8192));
-        assert_eq!(0, sut.count_free_addresses());
+        let (mut device, mut sut) = get_sut();
+
+        assert_eq!(Ok(8191), take_nth_blocks(&mut sut, &mut device, 8192));
+        assert_eq!(Ok(0), sut.count_free_addresses(&mut device));
 
         let mut addrs = [0; 10];
-        assert_eq!(Err(Error::StorageFull), sut.allocate_n(8, &mut addrs));
+        assert_eq!(Err(Error::StorageFull), sut.allocate_n(&mut device, 8, &mut addrs));
 
         // Release sparse addresses
-        sut.release(100);
-        sut.release(200);
-        sut.release(300);
-        sut.release(1000);
-        sut.release(2000);
-        sut.release(3000);
-        sut.release(7500);
-        sut.release(1300);
+        assert_eq!(Ok(()), sut.release(&mut device, 100));
+        assert_eq!(Ok(()), sut.release(&mut device, 200));
+        assert_eq!(Ok(()), sut.release(&mut device, 300));
+        assert_eq!(Ok(()), sut.release(&mut device, 1000));
+        assert_eq!(Ok(()), sut.release(&mut device, 2000));
+        assert_eq!(Ok(()), sut.release(&mut device, 3000));
+        assert_eq!(Ok(()), sut.release(&mut device, 7500));
+        assert_eq!(Ok(()), sut.release(&mut device, 1300));
 
-        assert_eq!(Ok(()), sut.allocate_n(8, &mut addrs));
+        assert_eq!(Ok(()), sut.allocate_n(&mut device, 8, &mut addrs));
         assert_eq!([100, 200, 300, 1000, 1300, 2000, 3000, 7500], addrs[0..8]);
 
         // Now reproduce a rollback
-        addrs[0..8].iter().for_each(|n| sut.release(*n));
+        addrs[0..8].iter().for_each(|n| sut.release(&mut device, *n).unwrap());
 
-        assert_eq!(8, sut.count_free_addresses());
-        assert_eq!(Err(Error::StorageFull), sut.allocate_n(10, &mut addrs));
-        assert_eq!(8, sut.count_free_addresses());
-    }
-
-    #[test]
-    fn write_and_read_to_device() {
-        let mut out = MockDevice::new();
-        let mut sut = DataAllocator::new();
-        assert_eq!(Ok(0), sut.allocate());
-        assert_eq!(Ok(1), sut.allocate());
-        assert_eq!(Ok(2), sut.allocate());
-        assert_eq!(8189, sut.count_free_addresses());
-
-        assert_eq!(Ok(()), sut.write_to_device(&mut out));
-
-        let loaded =
-            DataAllocator::read_from_device(&mut out).expect("read from device should succeed");
-
-        assert_eq!(sut.count_free_addresses(), loaded.count_free_addresses());
+        assert_eq!(Ok(8), sut.count_free_addresses(&mut device));
+        assert_eq!(Err(Error::StorageFull), sut.allocate_n(&mut device, 10, &mut addrs));
+        assert_eq!(Ok(8), sut.count_free_addresses(&mut device));
     }
 }

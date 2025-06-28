@@ -2,7 +2,7 @@ use crate::{
     BlockDevice, Error,
     filesystem::{
         DataAllocator, DataWriter, Directory, EntryIter, EraseFromDevice, File, FileHandle,
-        FileName, MAX_FILENAME_LEN, Meta, Node, NodeHandle, NodeWriter, ReadFromDevice,
+        FileName, Layout, MAX_FILENAME_LEN, Meta, Node, NodeHandle, NodeWriter, ReadFromDevice,
         StaticReadFromDevice, WriteToDevice,
     },
 };
@@ -26,7 +26,7 @@ where
             return Err(Error::Unsupported);
         }
         let directory = Directory::read_from_device(&mut device)?;
-        let data_allocator = DataAllocator::read_from_device(&mut device)?;
+        let data_allocator = DataAllocator::new(Layout::FREE);
         Ok(Self { directory, data_allocator, device })
     }
 
@@ -59,12 +59,11 @@ where
 
         let entry = self.directory.add_file(file_name)?;
         let file = File::new(file_name, entry.file_addr());
-        let node = self.data_allocator.allocate_node_data(file_size)?;
+        let node = self.data_allocator.allocate_node_data(&mut self.device, file_size)?;
         DataWriter::new(node.block_addrs(), data).write_to_device(&mut self.device)?;
         NodeWriter::new(file.addr(), &node).write_to_device(&mut self.device)?;
         file.write_to_device(&mut self.device)?;
         self.directory.write_to_device(&mut self.device)?;
-        self.data_allocator.write_to_device(&mut self.device)?;
         Ok(())
     }
 
@@ -82,9 +81,7 @@ where
             self.directory.write_to_device(&mut self.device)?;
 
             // Release data blocks only after metadata is fully erased.
-            self.data_allocator.release_node_data(&node);
-            self.data_allocator.write_to_device(&mut self.device)?;
-
+            self.data_allocator.release_node_data(&mut self.device, &node)?;
             return Ok(());
         }
 
