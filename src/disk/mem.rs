@@ -18,6 +18,9 @@ pub struct MemoryDisk {
     block_size: usize,
     data: Box<[u8]>,
     pos: usize,
+
+    pub writes_count: usize,
+    pub reads_count: usize,
 }
 
 impl MemoryDisk {
@@ -27,7 +30,7 @@ impl MemoryDisk {
 
     pub fn new(block_size: usize, capacity: usize) -> Self {
         let data = vec![0u8; capacity].into_boxed_slice();
-        Self { block_size, data, pos: 0 }
+        Self { block_size, data, pos: 0, reads_count: 0, writes_count: 0 }
     }
 
     pub fn slice(&self, start: usize, end: usize) -> &[u8] {
@@ -50,6 +53,7 @@ impl MemoryDisk {
         let len = buf.len().min(self.capacity());
         buf[..len].copy_from_slice(&self.data[self.pos..(self.pos + len)]);
         self.pos += len;
+        self.reads_count += 1;
         Ok(())
     }
 
@@ -57,6 +61,7 @@ impl MemoryDisk {
         let len = buf.len().min(self.capacity());
         self.data[self.pos..(self.pos + len)].copy_from_slice(&buf[..len]);
         self.pos += len;
+        self.writes_count += 1;
         Ok(())
     }
 
@@ -69,7 +74,13 @@ impl MemoryDisk {
         let mut file = File::open(path)?;
         let mut data = std::vec::Vec::new();
         file.read_to_end(&mut data)?;
-        Ok(Self { block_size, data: data.into_boxed_slice(), pos: 0 })
+        Ok(Self {
+            block_size,
+            data: data.into_boxed_slice(),
+            pos: 0,
+            reads_count: 0,
+            writes_count: 0,
+        })
     }
 }
 
