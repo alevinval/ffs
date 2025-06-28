@@ -1,6 +1,11 @@
-pub use block::Block;
 pub use controller::Controller;
 
+use crate::{
+    Error,
+    io::{Read, Write},
+};
+
+use block::Block;
 use data_allocator::DataAllocator;
 use data_writer::DataWriter;
 use directory::Directory;
@@ -14,11 +19,6 @@ use node::Node;
 use node_handle::NodeHandle;
 use node_writer::NodeWriter;
 use range::Range;
-
-use crate::{
-    Error,
-    io::{Read, Write},
-};
 
 mod block;
 mod controller;

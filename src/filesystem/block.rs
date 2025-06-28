@@ -4,7 +4,7 @@ use crate::io::{Reader, Writer};
 
 /// Keeps a buffer of [`Block::LEN`] bytes.
 #[derive(Eq, PartialEq)]
-pub struct Block {
+pub(crate) struct Block {
     inner: [u8; Self::LEN],
 }
 
