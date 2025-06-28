@@ -76,5 +76,6 @@ Ligula congue sollicitudin erat viverra ac tincidunt nam. Euismod quam justo lec
     rm_file(&mut ctrl, fname);
     ls_files(&mut ctrl);
 
-    ctrl.device().persist_to_file("sdcard.img").expect("Failed to persist SD card image");
+    let sdcard = ctrl.unmount();
+    sdcard.persist_to_file("sdcard.img").expect("Failed to persist SD card image");
 }

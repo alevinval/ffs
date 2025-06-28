@@ -6,6 +6,7 @@ use crate::{
 };
 
 use block::Block;
+use cache::BlockCache;
 use data_allocator::DataAllocator;
 use data_writer::DataWriter;
 use directory::Directory;
@@ -21,6 +22,7 @@ use node_writer::NodeWriter;
 use range::Range;
 
 mod block;
+mod cache;
 mod controller;
 mod data_allocator;
 mod data_writer;

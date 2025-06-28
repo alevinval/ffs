@@ -1,9 +1,9 @@
 use crate::{
     BlockDevice, Error,
     filesystem::{
-        DataAllocator, DataWriter, Directory, EntryIter, EraseFromDevice, File, FileHandle,
-        FileName, Layout, MAX_FILENAME_LEN, Meta, Node, NodeHandle, NodeWriter, ReadFromDevice,
-        StaticReadFromDevice, WriteToDevice,
+        BlockCache, DataAllocator, DataWriter, Directory, EntryIter, EraseFromDevice, File,
+        FileHandle, FileName, Layout, MAX_FILENAME_LEN, Meta, Node, NodeHandle, NodeWriter,
+        ReadFromDevice, StaticReadFromDevice, WriteToDevice,
     },
 };
 
@@ -12,7 +12,7 @@ pub struct Controller<D>
 where
     D: BlockDevice,
 {
-    device: D,
+    device: BlockCache<D>,
     directory: Directory,
     data_allocator: DataAllocator,
 }
@@ -27,11 +27,12 @@ where
         }
         let directory = Directory {};
         let data_allocator = DataAllocator::new(Layout::FREE);
-        Ok(Self { directory, data_allocator, device })
+        let device = BlockCache::mount(device);
+        Ok(Controller { device, directory, data_allocator })
     }
 
     pub fn unmount(self) -> D {
-        self.device
+        self.device.unmount()
     }
 
     pub fn format(device: &mut D) -> Result<(), Error> {
@@ -83,11 +84,7 @@ where
         Ok(())
     }
 
-    pub fn entries(&mut self) -> EntryIter<D> {
+    pub fn entries(&mut self) -> EntryIter<BlockCache<D>> {
         self.directory.iter(&mut self.device)
-    }
-
-    pub fn device(&mut self) -> &mut D {
-        &mut self.device
     }
 }

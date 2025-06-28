@@ -28,7 +28,7 @@ fn create_file() {
         assert_eq!(1, ctrl.entries().count());
     });
 
-    assert_eq!(3075, device.reads_count);
+    assert_eq!(3074, device.reads_count);
     assert_eq!(5, device.writes_count)
 }
 
@@ -44,7 +44,7 @@ fn create_then_delete_file() {
         assert_eq!(0, ctrl.entries().count());
     });
 
-    assert_eq!(3090, device.reads_count);
+    assert_eq!(3077, device.reads_count);
     assert_eq!(18, device.writes_count)
 }
 
@@ -76,7 +76,6 @@ fn create_more_than_max_files() {
         let n = 1024;
         for i in 0..=n {
             let file_name = format!("/file-{i}");
-            println!("Creating file: {file_name}");
             if i < n {
                 assert_eq!(Ok(()), ctrl.create(&file_name, DATA_FIXTURE));
             } else {
@@ -85,7 +84,7 @@ fn create_more_than_max_files() {
         }
     });
 
-    assert_eq!(1576449, device.reads_count);
+    assert_eq!(1576421, device.reads_count);
     assert_eq!(4097, device.writes_count);
 }
 
