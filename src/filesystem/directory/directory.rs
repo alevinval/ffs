@@ -1,7 +1,10 @@
+use std::println;
+
 use crate::{
     Addr, BlockDevice, Error,
     filesystem::{
-        Block, Deserializable, FileName, Layout, MAX_FILES, Serializable, directory::FileEntry,
+        FileName, Layout,
+        directory::{DirEntry, FileEntry},
     },
 };
 
@@ -9,135 +12,178 @@ use crate::{
 pub struct Directory {}
 
 impl Directory {
-    const LEN: usize = MAX_FILES;
-
-    pub fn add_file<D>(&self, device: &mut D, file_name: FileName) -> Result<FileEntry, Error>
+    pub fn insert<D>(&self, device: &mut D, path: FileName) -> Result<FileEntry, Error>
     where
         D: BlockDevice,
     {
-        for idx in 0..Self::LEN as Addr {
-            let mut entry = load_entry(device, idx)?;
-            if !entry.is_valid() {
-                entry.update(file_name, idx as Addr);
-                store_entry(device, idx, &entry)?;
-                return Ok(entry);
-            }
-        }
-        Err(Error::StorageFull)
+        insert_file(device, path, 0)
     }
 
-    pub fn remove_file<D>(&self, device: &mut D, file_name: &FileName) -> Result<(), Error>
+    pub fn remove<D>(&self, device: &mut D, path: FileName) -> Result<(), Error>
     where
         D: BlockDevice,
     {
-        for idx in 0..Self::LEN as Addr {
-            let entry = load_entry(device, idx)?;
-            if entry.is_valid() && entry.name() == file_name {
-                store_entry(device, idx, &FileEntry::default())?;
-                return Ok(());
-            }
-        }
-        Err(Error::FileNotFound)
+        remove_file(device, path, 0)
     }
 
-    pub fn find_file<D>(&self, device: &mut D, file_name: &FileName) -> Result<FileEntry, Error>
+    pub fn get<D>(&self, device: &mut D, path: FileName) -> Result<FileEntry, Error>
     where
         D: BlockDevice,
     {
-        for idx in 0..Self::LEN as Addr {
-            let entry = load_entry(device, idx)?;
-            if entry.is_valid() && entry.name() == file_name {
-                return Ok(entry);
-            }
-        }
-        Err(Error::FileNotFound)
+        find_file(device, path, 0)
     }
 
-    pub fn file_exists<D>(&self, device: &mut D, name: &FileName) -> bool
+    pub fn count_files<D>(&self, device: &mut D) -> Result<usize, Error>
     where
         D: BlockDevice,
     {
-        self.find_file(device, name).is_ok()
+        count_files(device, 0)
     }
 
-    pub fn iter<'a, D>(&self, device: &'a mut D) -> EntryIter<'a, D>
+    pub fn print_tree<D>(&self, device: &mut D) -> Result<(), Error>
     where
         D: BlockDevice,
     {
-        EntryIter::new(device)
+        print_tree_inner(device, 0, FileName::empty(), 0, 0)
     }
 }
 
-fn load_entry<D>(device: &mut D, idx: Addr) -> Result<FileEntry, Error>
-where
-    D: BlockDevice,
-{
-    let mut block = Block::new();
-    let sector = Layout::TABLE.nth(idx);
-    device.read_block(sector, &mut block)?;
-    FileEntry::deserialize(&mut block.reader())
+fn remove_file<D: BlockDevice>(device: &mut D, path: FileName, addr: Addr) -> Result<(), Error> {
+    let mut current = DirEntry::load(device, addr)?;
+    if path.dirname() == current.name {
+        if let Some(file) =
+            current.files.iter_mut().find(|f| f.is_valid() && f.name() == path.basename())
+        {
+            *file = FileEntry::empty();
+            current.store(device, addr)?;
+            return Ok(());
+        }
+        return Err(Error::FileNotFound);
+    }
+
+    let is_root = addr == 0;
+    for next_addr in current.dirs.into_iter().filter(|addr| *addr != 0) {
+        let next_path = if is_root { path } else { path.tail() };
+        if remove_file(device, next_path, next_addr).is_ok() {
+            return Ok(());
+        }
+    }
+    Err(Error::FileNotFound)
 }
 
-fn store_entry<D>(device: &mut D, idx: Addr, entry: &FileEntry) -> Result<(), Error>
-where
-    D: BlockDevice,
-{
-    let mut block = Block::new();
-    entry.serialize(&mut block.writer())?;
-    let sector = Layout::TABLE.nth(idx);
-    device.write_block(sector, &block)?;
+fn find_file<D: BlockDevice>(
+    device: &mut D,
+    path: FileName,
+    addr: Addr,
+) -> Result<FileEntry, Error> {
+    let mut current = DirEntry::load(device, addr)?;
+    if path.dirname() == current.name {
+        if let Some(file) =
+            current.files.iter_mut().find(|f| f.is_valid() && f.name() == path.basename())
+        {
+            return Ok(file.clone());
+        }
+        return Err(Error::FileNotFound);
+    }
+
+    let is_root = addr == 0;
+    for next_addr in current.dirs.into_iter().filter(|addr| *addr != 0) {
+        let next_path = if is_root { path } else { path.tail() };
+        if let Ok(file) = find_file(device, next_path, next_addr) {
+            return Ok(file.clone());
+        }
+    }
+    Err(Error::FileNotFound)
+}
+
+fn insert_file<D: BlockDevice>(
+    device: &mut D,
+    path: FileName,
+    addr: Addr,
+) -> Result<FileEntry, Error> {
+    let mut current = DirEntry::load(device, addr)?;
+
+    // No directory left, do file insertion on the current entry.
+    if path.dirname().is_empty() {
+        if current.files.iter().any(|e| e.name() == path) {
+            return Err(Error::FileAlreadyExists);
+        }
+
+        let pos = current.files.iter_mut().position(|f| !f.is_valid()).ok_or(Error::StorageFull)?;
+        let file_addr = addr * DirEntry::MAX_CHILD_FILES as Addr + pos as Addr;
+        let file_entry = FileEntry::new(path, file_addr);
+        current.files[pos] = file_entry.clone();
+        current.store(device, addr)?;
+        return Ok(file_entry);
+    }
+
+    // Otherwise, check the children directories to see if we need to follow it.
+    let first_component = path.first_component();
+    for next_addr in current.dirs.into_iter().filter(|a| *a != 0) {
+        let dir = DirEntry::load(device, next_addr)?;
+        if dir.name == first_component {
+            return insert_file(device, path.tail(), next_addr);
+        }
+    }
+
+    // If we reach here, it means we need to create a new directory entry for the first component.
+    // First check if the current node can fit another child directory.
+    let dir_pointer = current.dirs.iter_mut().find(|addr| **addr == 0).ok_or(Error::StorageFull)?;
+    let next_addr = find_free_addr_for_direntry(device)?;
+    let entry = DirEntry::new(FileName::new(first_component).unwrap());
+    entry.store(device, next_addr)?;
+
+    // Persist current entry, and continue insertion in the new directory.
+    *dir_pointer = next_addr;
+    current.store(device, addr)?;
+    insert_file(device, path.tail(), next_addr)
+}
+
+fn find_free_addr_for_direntry<D: BlockDevice>(device: &mut D) -> Result<Addr, Error> {
+    for (addr, _) in Layout::BTREE.iter().skip(1) {
+        let entry = DirEntry::load(device, addr)?;
+        if entry.name.is_empty() {
+            return Ok(addr);
+        }
+    }
+    Err(Error::StorageFull)
+}
+
+fn print_tree_inner<D: BlockDevice>(
+    device: &mut D,
+    addr: Addr,
+    acc: FileName,
+    depth: usize,
+    max_depth: usize,
+) -> Result<(), Error> {
+    if max_depth > 0 && depth >= max_depth {
+        return Ok(());
+    }
+
+    let sep = FileName::new("/").unwrap();
+    let current_node = DirEntry::load(device, addr)?;
+    let acc = acc + current_node.name + sep;
+
+    println!("{}{}/", "  ".repeat(depth), current_node.name.as_str());
+    for child_idx in current_node.dirs.iter().filter(|a| **a != 0) {
+        print_tree_inner(device, *child_idx, acc, depth + 1, max_depth)?
+    }
+
+    for entry in current_node.files.iter().filter(|e| e.is_valid()) {
+        println!("{}{}", "  ".repeat(depth + 2), entry.name().as_str());
+    }
+
     Ok(())
 }
 
-pub struct EntryIter<'a, D>
+fn count_files<D>(device: &mut D, addr: Addr) -> Result<usize, Error>
 where
     D: BlockDevice,
 {
-    device: &'a mut D,
-    pos: usize,
-}
-
-impl<'a, D> core::iter::Iterator for EntryIter<'a, D>
-where
-    D: BlockDevice,
-{
-    type Item = FileEntry;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        while self.pos < Directory::LEN {
-            if let Ok(entry) = load_entry(self.device, self.pos as Addr) {
-                self.pos += 1;
-                if !entry.is_valid() {
-                    continue;
-                }
-                return Some(entry);
-            }
-            self.pos += 1;
-        }
-        None
+    let current_node = DirEntry::load(device, addr)?;
+    let mut count = current_node.files.iter().filter(|e| e.is_valid()).count();
+    for addr in current_node.dirs.iter().filter(|a| **a != 0) {
+        count += count_files(device, *addr)?;
     }
-}
-
-impl<'a, D> EntryIter<'a, D>
-where
-    D: BlockDevice,
-{
-    pub fn new(device: &'a mut D) -> Self {
-        Self { device, pos: 0 }
-    }
-}
-
-#[cfg(test)]
-mod test {
-
-    use crate::test_utils::MockDevice;
-
-    use super::*;
-
-    #[test]
-    fn create_empty_directory_table() {
-        let mut device = MockDevice::new();
-        let table = Directory {};
-        assert_eq!(None, table.iter(&mut device).next());
-    }
+    Ok(count)
 }

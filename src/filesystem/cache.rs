@@ -2,7 +2,7 @@ use crate::{Addr, BlockDevice, Error, filesystem::block::Block};
 
 #[derive(Debug)]
 struct CacheEntry {
-    sector: u32,
+    sector: Addr,
     block: Block,
 }
 

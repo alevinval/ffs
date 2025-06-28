@@ -1,4 +1,4 @@
-use ffs::{BlockDevice, Controller, Error, disk::MemoryDisk};
+use ffs::{BlockDevice, Controller, DirEntry, Error, disk::MemoryDisk};
 
 const FILE_NAME: &str = "/some/path/some-file-name";
 const DATA_FIXTURE: &[u8] = b"some data for file";
@@ -17,35 +17,35 @@ fn mount_device_formatted() {
     let device = sut.unmount();
 
     assert_eq!(1, device.reads_count);
-    assert_eq!(1, device.writes_count);
+    assert_eq!(5, device.writes_count);
 }
 
 #[test]
 fn create_file() {
     let device = mounting(device(), |ctrl| {
-        assert_eq!(0, ctrl.entries().count());
+        assert_eq!(Ok(0), ctrl.count_files());
         assert_eq!(Ok(()), ctrl.create(FILE_NAME, DATA_FIXTURE));
-        assert_eq!(1, ctrl.entries().count());
+        assert_eq!(Ok(1), ctrl.count_files());
     });
 
-    assert_eq!(3075, device.reads_count);
-    assert_eq!(6, device.writes_count)
+    assert_eq!(27, device.reads_count);
+    assert_eq!(29, device.writes_count)
 }
 
 #[test]
 fn create_then_delete_file() {
     let device = mounting(device(), |ctrl| {
         assert_eq!(Ok(()), ctrl.create(FILE_NAME, DATA_FIXTURE));
-        assert_eq!(1, ctrl.entries().count());
+        assert_eq!(Ok(1), ctrl.count_files());
     });
 
     let device = mounting(device, |ctrl| {
         assert_eq!(Ok(()), ctrl.delete(FILE_NAME));
-        assert_eq!(0, ctrl.entries().count());
+        assert_eq!(Ok(0), ctrl.count_files());
     });
 
-    assert_eq!(3078, device.reads_count);
-    assert_eq!(19, device.writes_count)
+    assert_eq!(66, device.reads_count);
+    assert_eq!(45, device.writes_count)
 }
 
 #[test]
@@ -56,7 +56,7 @@ fn create_file_with_long_name_fails() {
     });
 
     assert_eq!(1, device.reads_count);
-    assert_eq!(1, device.writes_count);
+    assert_eq!(5, device.writes_count);
 }
 
 #[test]
@@ -67,25 +67,36 @@ fn create_file_with_data_too_big() {
     });
 
     assert_eq!(1, device.reads_count);
-    assert_eq!(1, device.writes_count);
+    assert_eq!(5, device.writes_count);
 }
 
 #[test]
-fn create_more_than_max_files() {
+fn create_max_files() {
     let device = mounting(device(), |ctrl| {
-        let n = 1024;
-        for i in 0..=n {
-            let file_name = format!("/file-{i}");
-            if i < n {
-                assert_eq!(Ok(()), ctrl.create(&file_name, DATA_FIXTURE));
-            } else {
-                assert_eq!(Error::StorageFull, ctrl.create(&file_name, DATA_FIXTURE).unwrap_err());
+        let n_files = 1024;
+
+        let mut dir = 0;
+        let mut subdir = 0;
+
+        for i in 0..=n_files {
+            let full_dir = i % DirEntry::MAX_CHILD_FILES == 0;
+
+            if full_dir && i > 0 {
+                subdir += 1;
+                if subdir == DirEntry::MAX_CHILD_DIRS {
+                    subdir = 0;
+                    dir += 1;
+                }
             }
+
+            let file_name = format!("/{dir}/{subdir}/file-{i}");
+            println!("creating {file_name}");
+            assert_eq!(Ok(()), ctrl.create(&file_name, DATA_FIXTURE));
         }
     });
 
-    assert_eq!(1577452, device.reads_count);
-    assert_eq!(5121, device.writes_count);
+    assert_eq!(48147, device.reads_count);
+    assert_eq!(8533, device.writes_count);
 }
 
 #[test]
@@ -93,12 +104,16 @@ fn create_file_twice_fails() {
     let device = mounting(device(), |ctrl| {
         assert_eq!(Ok(()), ctrl.create(FILE_NAME, DATA_FIXTURE));
     });
+
     let device = mounting(device, |ctrl| {
-        assert_eq!(Error::FileAlreadyExists, ctrl.create(FILE_NAME, DATA_FIXTURE).unwrap_err(),);
+        assert_eq!(
+            Error::FileAlreadyExists,
+            ctrl.create(FILE_NAME, DATA_FIXTURE).expect_err("should have failed creating twice")
+        );
     });
 
-    assert_eq!(1030, device.reads_count);
-    assert_eq!(6, device.writes_count);
+    assert_eq!(28, device.reads_count);
+    assert_eq!(29, device.writes_count);
 }
 
 #[test]
@@ -107,8 +122,8 @@ fn delete_file_that_does_not_exist() {
         assert_eq!(Error::FileNotFound, ctrl.delete(FILE_NAME).unwrap_err());
     });
 
-    assert_eq!(1025, device.reads_count);
-    assert_eq!(1, device.writes_count);
+    assert_eq!(5, device.reads_count);
+    assert_eq!(5, device.writes_count);
 }
 
 fn device() -> MemoryDisk {

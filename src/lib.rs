@@ -5,7 +5,7 @@ extern crate std;
 
 pub(crate) use filesystem::Addr;
 
-pub use filesystem::{BlockDevice, Controller};
+pub use filesystem::{BlockDevice, Controller, DirEntry};
 
 pub mod disk;
 mod filesystem;

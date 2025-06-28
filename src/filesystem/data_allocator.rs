@@ -41,7 +41,7 @@ impl DataAllocator {
     #[cfg(test)]
     fn count_free_addresses<D: BlockDevice>(&self, device: &mut D) -> Result<Addr, Error> {
         let mut block = Block::new();
-        let mut total = 0;
+        let mut total = 0 as Addr;
 
         for sector in self.range.iter_sectors() {
             device.read_block(sector, &mut block)?;
@@ -154,8 +154,8 @@ impl DataAllocator {
     }
 }
 
-const fn to_allocated_offset(addr: Addr) -> u32 {
-    addr % Free::SLOTS as u32
+const fn to_allocated_offset(addr: Addr) -> Addr {
+    addr % Free::SLOTS as Addr
 }
 
 const fn to_free_logical(addr: Addr) -> usize {

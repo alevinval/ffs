@@ -8,22 +8,15 @@ use crate::{
 pub struct FileEntry {
     file_name: FileName,
     file_addr: Addr,
-    is_valid: bool,
 }
 
 impl FileEntry {
     pub const fn empty() -> Self {
-        Self { file_name: FileName::empty(), file_addr: 0, is_valid: false }
+        Self { file_name: FileName::empty(), file_addr: 0 }
     }
 
     pub const fn new(file_name: FileName, file_addr: Addr) -> Self {
-        Self { file_name, file_addr, is_valid: false }
-    }
-
-    pub fn update(&mut self, file_name: FileName, file_addr: Addr) {
-        self.file_name = file_name;
-        self.file_addr = file_addr;
-        self.is_valid = true;
+        Self { file_name, file_addr }
     }
 
     pub const fn name(&self) -> &FileName {
@@ -31,7 +24,7 @@ impl FileEntry {
     }
 
     pub const fn is_valid(&self) -> bool {
-        self.is_valid
+        !self.file_name.is_empty()
     }
 
     pub const fn file_addr(&self) -> Addr {
@@ -46,14 +39,13 @@ impl Default for FileEntry {
 }
 
 impl SerdeLen for FileEntry {
-    const SERDE_LEN: usize = FileName::SERDE_LEN + 5;
+    const SERDE_LEN: usize = FileName::SERDE_LEN + size_of::<Addr>();
 }
 
 impl Serializable for FileEntry {
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<usize, Error> {
         let mut n = self.file_name.serialize(writer)?;
         n += writer.write_u32(self.file_addr)?;
-        n += writer.write_u8(self.is_valid as u8)?;
         Ok(n)
     }
 }
@@ -62,8 +54,7 @@ impl Deserializable<FileEntry> for FileEntry {
     fn deserialize<R: Read>(reader: &mut R) -> Result<FileEntry, Error> {
         let file_name = FileName::deserialize(reader)?;
         let file_addr = reader.read_u32()?;
-        let is_empty = reader.read_u8()? != 0;
-        Ok(FileEntry { file_name, file_addr, is_valid: is_empty })
+        Ok(FileEntry { file_name, file_addr })
     }
 }
 

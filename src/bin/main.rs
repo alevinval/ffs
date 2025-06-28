@@ -1,30 +1,21 @@
 use ffs::{BlockDevice, Controller, disk::MemoryDisk};
 
-fn ls_files<D>(ctrl: &mut Controller<D>)
+fn ls_tree<D>(ctrl: &mut Controller<D>)
 where
     D: BlockDevice,
 {
-    println!("ls-files:");
-
-    let mut files = ctrl.entries().peekable();
-
-    if files.peek().is_none() {
-        println!("<empty>");
-        return;
-    }
-
-    for f in files {
-        println!("- {}", f.name().as_str());
-    }
+    println!("[listing tree]");
+    ctrl.print_tree().unwrap();
+    println!()
 }
 
 fn rm_file<D>(ctrl: &mut Controller<D>, fname: &str)
 where
     D: BlockDevice,
 {
-    println!("rm {fname}");
+    println!("[deleting {fname}]");
     ctrl.delete(fname).expect("failed");
-    println!("deleted file {fname}");
+    println!()
 }
 
 fn main() {
@@ -66,15 +57,15 @@ Ligula congue sollicitudin erat viverra ac tincidunt nam. Euismod quam justo lec
     let mut ctrl = Controller::mount(sdcard).expect("failed to read metadata");
 
     println!("Controller initialized");
-    ls_files(&mut ctrl);
+    ls_tree(&mut ctrl);
 
     println!("Creating file...");
-    let fname = "lorem_ipsum8.txt";
+    let fname = "hello/world/lorem_ipsum8.txt";
     ctrl.create(fname, data).expect("failed to create file");
 
-    ls_files(&mut ctrl);
+    ls_tree(&mut ctrl);
     rm_file(&mut ctrl, fname);
-    ls_files(&mut ctrl);
+    ls_tree(&mut ctrl);
 
     let sdcard = ctrl.unmount();
     sdcard.persist_to_file("sdcard.img").expect("Failed to persist SD card image");

@@ -28,7 +28,7 @@ impl Meta {
 
     pub const fn new() -> Self {
         Meta {
-            table_sector: Layout::TABLE.begin,
+            table_sector: Layout::BTREE.begin,
             file_sector: Layout::FILE.begin,
             node_sector: Layout::NODE.begin,
             free_sector: Layout::FREE.begin,

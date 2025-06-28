@@ -1,7 +1,7 @@
 use crate::{
     Error,
     filesystem::{Addr, Block, SerdeLen, Serializable},
-    io::Write,
+    io::{Read, Reader, Write},
 };
 
 const fn get_blocks_needed(file_size: u16) -> usize {
@@ -34,18 +34,13 @@ impl Node {
     }
 
     pub fn deserialize(buf: &[u8]) -> Result<Node, Error> {
-        let mut file_size = [0u8; 2];
-        file_size.copy_from_slice(&buf[0..2]);
-        let file_size = u16::from_le_bytes(file_size);
-
+        let mut reader = Reader::new(buf);
+        let file_size = reader.read_u16()?;
         let n_blocks = get_blocks_needed(file_size);
-        let mut block_addrs = [0u32; Node::BLOCKS_PER_NODE];
-        let mut block_addr_buf = [0u8; 4];
-        let mut n = 2;
+
+        let mut block_addrs = [0 as Addr; Node::BLOCKS_PER_NODE];
         for addr in block_addrs.iter_mut().take(n_blocks) {
-            block_addr_buf.copy_from_slice(&buf[n..n + 4]);
-            n += 4;
-            *addr = Addr::from_le_bytes(block_addr_buf);
+            *addr = reader.read_u32()?;
         }
 
         Ok(Node { file_len: file_size, block_addrs })
@@ -53,7 +48,7 @@ impl Node {
 }
 
 impl SerdeLen for Node {
-    const SERDE_LEN: usize = 2 + (4 * Self::BLOCKS_PER_NODE);
+    const SERDE_LEN: usize = 2 + (size_of::<Addr>() * Self::BLOCKS_PER_NODE);
 }
 
 impl Serializable for Node {

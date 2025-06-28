@@ -31,12 +31,12 @@ impl Free {
 
     /// Counts number of free addresses.
     #[cfg(test)]
-    pub fn count_free_addresses(&self) -> u32 {
+    pub fn count_free_addresses(&self) -> Addr {
         let mut n = 0;
         for octet in self.inner.iter() {
             n += u8::count_zeros(*octet);
         }
-        n
+        n as Addr
     }
 
     /// Attempts to allocate the first available address.
@@ -51,7 +51,7 @@ impl Free {
             if taken_bits < u8::BITS {
                 *byte |= 1 << taken_bits;
                 self.last_free += pos;
-                return Some((8 * self.last_free as u32) + taken_bits);
+                return Some((8 * self.last_free as Addr) + taken_bits as Addr);
             }
         }
         None

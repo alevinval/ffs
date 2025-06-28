@@ -34,7 +34,7 @@ impl Serializable for File {
 
 impl Deserializable<File> for File {
     fn deserialize<R: Read>(reader: &mut R) -> Result<File, Error> {
-        let addr: u32 = reader.read_u32()?;
+        let addr = reader.read_u32()?;
         let name = FileName::deserialize(reader)?;
         Ok(File { name, addr })
     }

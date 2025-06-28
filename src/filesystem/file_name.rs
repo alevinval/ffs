@@ -79,23 +79,23 @@ impl FileName {
     }
 
     /// Returns a new [`FileName`] that represents the inner path after the first component.
-    pub fn tail_path(&self) -> Self {
+    pub fn tail(&self) -> Self {
         if self.basename().is_empty() {
             return *self;
         }
 
-        let str = self.as_str();
-        let first = get_first_component(str);
-        FileName::new(str.strip_prefix(first).unwrap()).unwrap()
+        let first = self.first_component();
+        FileName::new(self.as_str().strip_prefix(first).unwrap()).unwrap()
+    }
+
+    /// Returns the first component of the file name, which is the part before the first slash.
+    pub fn first_component(&self) -> &str {
+        self.as_str().split('/').next().unwrap_or("")
     }
 }
 
 fn canonicalize(file_name: &str) -> &str {
     file_name.trim_start_matches('/').trim_end_matches('/')
-}
-
-fn get_first_component(file_name: &str) -> &str {
-    file_name.split('/').next().unwrap_or("")
 }
 
 impl Add for FileName {
@@ -139,6 +139,30 @@ impl Deserializable<FileName> for FileName {
         let mut bytes = [0u8; MAX_FILENAME_LEN];
         reader.read(&mut bytes)?;
         Ok(Self { bytes, len })
+    }
+}
+
+impl PartialEq<str> for FileName {
+    fn eq(&self, other: &str) -> bool {
+        self.as_str() == other
+    }
+}
+
+impl PartialEq<&str> for FileName {
+    fn eq(&self, other: &&str) -> bool {
+        self.as_str() == *other
+    }
+}
+
+impl PartialEq<FileName> for &FileName {
+    fn eq(&self, other: &FileName) -> bool {
+        self.as_str() == other.as_str()
+    }
+}
+
+impl PartialEq<FileName> for &str {
+    fn eq(&self, other: &FileName) -> bool {
+        other.as_str() == *self
     }
 }
 
@@ -237,9 +261,9 @@ mod tests {
     #[test]
     fn tail_path() {
         let input = FileName::new("foo/bar/baz").unwrap();
-        let tail = input.tail_path();
+        let tail = input.tail();
         assert_eq!("bar/baz", tail.as_str());
-        assert_eq!("baz", tail.tail_path().as_str());
+        assert_eq!("baz", tail.tail().as_str());
     }
 
     #[test]

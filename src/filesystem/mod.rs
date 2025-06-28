@@ -1,4 +1,5 @@
 pub use controller::Controller;
+pub use directory::DirEntry;
 
 use crate::{
     Error,
@@ -10,7 +11,6 @@ use cache::BlockCache;
 use data_allocator::DataAllocator;
 use data_writer::DataWriter;
 use directory::Directory;
-use directory::EntryIter;
 use file::File;
 use file_handle::FileHandle;
 use file_name::FileName;
@@ -39,14 +39,17 @@ mod range;
 
 pub type Addr = u32; // Logical address type for sectors/blocks. Change here to update everywhere.
 
+/// Maximum number of entries in the B-tree used for directory entries.
+const MAX_BTREE_ENTRIES: usize = 50;
+
 /// Maximum number of files in the file system
-const MAX_FILES: usize = 1024;
+const MAX_FILES: usize = MAX_BTREE_ENTRIES * DirEntry::MAX_CHILD_FILES;
 
 /// Maximum number of data blocks in the file system.
 const MAX_DATA_BLOCKS: usize = Node::BLOCKS_PER_NODE * MAX_FILES;
 
 /// Maximum length of a file name in bytes.
-const MAX_FILENAME_LEN: usize = 128;
+const MAX_FILENAME_LEN: usize = 63;
 
 pub struct Layout {}
 
@@ -54,8 +57,8 @@ pub struct Layout {}
 /// offsets to logical addresses.
 impl Layout {
     pub const META: Range = Range::new(0, 1);
-    pub const TABLE: Range = Self::META.next_range(MAX_FILES, 1);
-    pub const FILE: Range = Self::TABLE.next_range(MAX_FILES, 1);
+    pub const BTREE: Range = Self::META.next_range(MAX_BTREE_ENTRIES, DirEntry::SERDE_BLOCK_COUNT);
+    pub const FILE: Range = Self::BTREE.next_range(MAX_FILES, 1);
     pub const NODE: Range = Self::FILE.next_range(MAX_FILES, 1);
     pub const FREE: Range = Self::NODE.next_range(MAX_DATA_BLOCKS / Free::SLOTS, 1);
     pub const DATA: Range = Self::FREE.next_range(MAX_DATA_BLOCKS, 1);
@@ -64,6 +67,8 @@ impl Layout {
 /// Trait for types that have a constant length when serialized/deserialized.
 trait SerdeLen {
     const SERDE_LEN: usize;
+    const SERDE_BLOCK_COUNT: usize = Self::SERDE_LEN.div_ceil(Block::LEN);
+    const SERDE_BUFFER_LEN: usize = Self::SERDE_BLOCK_COUNT * Block::LEN;
 }
 
 trait Serializable {
@@ -126,8 +131,8 @@ mod test {
 
     #[test]
     fn ranges_layout() {
-        assert_continuous_range(Layout::META, Layout::TABLE);
-        assert_continuous_range(Layout::TABLE, Layout::FILE);
+        assert_continuous_range(Layout::META, Layout::BTREE);
+        assert_continuous_range(Layout::BTREE, Layout::FILE);
         assert_continuous_range(Layout::FILE, Layout::NODE);
         assert_continuous_range(Layout::NODE, Layout::FREE);
         assert_continuous_range(Layout::FREE, Layout::DATA);
