@@ -32,7 +32,11 @@ impl Range {
         Self(self.end(), self.end() + shift as Addr)
     }
 
-    pub const fn range_sectors(&self) -> core::ops::Range<Addr> {
+    pub const fn iter(&self) -> core::ops::Range<usize> {
+        0..self.len() as usize
+    }
+
+    pub const fn iter_sectors(&self) -> core::ops::Range<Addr> {
         self.begin()..self.end()
     }
 }
@@ -50,9 +54,17 @@ mod test {
     }
 
     #[test]
-    fn range_sectors() {
+    fn iter() {
         let range = Range::new(5, 10);
-        let iter = range.range_sectors();
+        let iter = range.iter();
+        assert_eq!(0, iter.start);
+        assert_eq!(5, iter.end)
+    }
+
+    #[test]
+    fn iter_sectors() {
+        let range = Range::new(5, 10);
+        let iter = range.iter_sectors();
         assert_eq!(5, iter.start);
         assert_eq!(10, iter.end)
     }

@@ -104,7 +104,7 @@ where
         let mut n = 0;
         let mut table = Directory::new();
         let mut block = Block::new();
-        for sector in Layout::TABLE.range_sectors() {
+        for sector in Layout::TABLE.iter_sectors() {
             device.read_block(sector, &mut block)?;
             let mut reader = block.reader();
             for _ in 0..Self::SLOTS {
