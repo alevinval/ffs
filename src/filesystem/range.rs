@@ -1,21 +1,24 @@
 use crate::filesystem::Addr;
 
 #[derive(Debug)]
-pub struct Range(Addr, Addr);
+pub struct Range {
+    begin: Addr,
+    end: Addr,
+}
 
 impl Range {
     pub const fn new(begin: Addr, end: Addr) -> Self {
-        assert!(begin < end, "Invalid range: begin must be less than end");
+        debug_assert!(begin < end, "Invalid range: begin must be less than end");
 
-        Self(begin, end)
+        Self { begin, end }
     }
 
     pub const fn begin(&self) -> Addr {
-        self.0
+        self.begin
     }
 
     pub const fn end(&self) -> Addr {
-        self.1
+        self.end
     }
 
     pub const fn len(&self) -> Addr {
@@ -29,7 +32,7 @@ impl Range {
     }
 
     pub const fn next(&self, shift: usize) -> Self {
-        Self(self.end(), self.end() + shift as Addr)
+        Self::new(self.end(), self.end() + shift as Addr)
     }
 
     pub const fn iter(&self) -> core::ops::Range<usize> {
