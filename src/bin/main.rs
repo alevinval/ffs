@@ -6,16 +6,17 @@ where
 {
     println!("ls-files:");
 
-    let mut files = ctrl.entries().peekable();
+    ctrl.print_tree();
+    // let mut files = ctrl.entries().peekable();
 
-    if files.peek().is_none() {
-        println!("<empty>");
-        return;
-    }
+    // if files.peek().is_none() {
+    //     println!("<empty>");
+    //     return;
+    // }
 
-    for f in files {
-        println!("- {}", f.name().as_str());
-    }
+    // for f in files {
+    //     println!("- {}", f.name().as_str());
+    // }
 }
 
 fn rm_file<D>(ctrl: &mut Controller<D>, fname: &str)

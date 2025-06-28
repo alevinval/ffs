@@ -4,7 +4,7 @@ use crate::filesystem::Addr;
 pub(crate) struct Range {
     pub begin: Addr,
     pub end: Addr,
-    pub block_per_entry: Addr,
+    pub blocks_per_entry: Addr,
 }
 
 impl Range {
@@ -16,7 +16,7 @@ impl Range {
         debug_assert!(blocks_per_entry > 0, "Entry size must be greater than zero");
 
         let end = begin + capacity * blocks_per_entry;
-        Self { begin, end, block_per_entry: blocks_per_entry }
+        Self { begin, end, blocks_per_entry }
     }
 
     pub const fn sector_count(&self) -> Addr {
@@ -24,13 +24,16 @@ impl Range {
     }
 
     pub const fn entries_count(&self) -> Addr {
-        self.sector_count() / self.block_per_entry
+        self.sector_count() / self.blocks_per_entry
     }
 
     pub const fn nth(&self, logical: Addr) -> Addr {
-        debug_assert!(self.begin + logical < self.end, "Address out of range");
+        debug_assert!(
+            self.begin + logical * self.blocks_per_entry < self.end,
+            "Address out of range"
+        );
 
-        self.begin + (logical * self.block_per_entry)
+        self.begin + (logical * self.blocks_per_entry)
     }
 
     pub const fn next_range(&self, capacity: usize, entry_size: usize) -> Self {
@@ -38,12 +41,12 @@ impl Range {
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (Addr, Addr)> {
-        (0..self.sector_count()).map(|addr| (addr, self.nth(addr)))
+        (0..self.entries_count()).map(|addr| (addr, self.nth(addr)))
     }
 
     pub fn circular_iter(&self, offset: Addr) -> impl Iterator<Item = (Addr, Addr)> {
         self.iter()
-            .map(move |(addr, _)| (addr + offset) % self.sector_count())
+            .map(move |(addr, _)| (addr + offset) % self.entries_count())
             .map(|addr| (addr, self.nth(addr)))
     }
 

@@ -2,6 +2,7 @@ pub use controller::Controller;
 
 use crate::{
     Error,
+    filesystem::directory::DirEntry,
     io::{Read, Write},
 };
 
@@ -10,7 +11,6 @@ use cache::BlockCache;
 use data_allocator::DataAllocator;
 use data_writer::DataWriter;
 use directory::Directory;
-use directory::EntryIter;
 use file::File;
 use file_handle::FileHandle;
 use file_name::FileName;
@@ -46,7 +46,7 @@ const MAX_FILES: usize = 1024;
 const MAX_DATA_BLOCKS: usize = Node::BLOCKS_PER_NODE * MAX_FILES;
 
 /// Maximum length of a file name in bytes.
-const MAX_FILENAME_LEN: usize = 128;
+const MAX_FILENAME_LEN: usize = 63;
 
 pub struct Layout {}
 
@@ -54,7 +54,7 @@ pub struct Layout {}
 /// offsets to logical addresses.
 impl Layout {
     pub const META: Range = Range::new(0, 1);
-    pub const TABLE: Range = Self::META.next_range(MAX_FILES, 1);
+    pub const TABLE: Range = Self::META.next_range(50, DirEntry::SERDE_BLOCK_COUNT);
     pub const FILE: Range = Self::TABLE.next_range(MAX_FILES, 1);
     pub const NODE: Range = Self::FILE.next_range(MAX_FILES, 1);
     pub const FREE: Range = Self::NODE.next_range(MAX_DATA_BLOCKS / Free::SLOTS, 1);
@@ -64,6 +64,8 @@ impl Layout {
 /// Trait for types that have a constant length when serialized/deserialized.
 trait SerdeLen {
     const SERDE_LEN: usize;
+    const SERDE_BLOCK_COUNT: usize = Self::SERDE_LEN.div_ceil(Block::LEN);
+    const SERDE_BUFFER_LEN: usize = Self::SERDE_BLOCK_COUNT * Block::LEN;
 }
 
 trait Serializable {

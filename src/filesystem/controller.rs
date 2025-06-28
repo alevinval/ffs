@@ -1,9 +1,11 @@
+use std::println;
+
 use crate::{
     BlockDevice, Error,
     filesystem::{
-        BlockCache, DataAllocator, DataWriter, Directory, EntryIter, EraseFromDevice, File,
-        FileHandle, FileName, Layout, MAX_FILENAME_LEN, Meta, Node, NodeHandle, NodeWriter,
-        ReadFromDevice, StaticReadFromDevice, WriteToDevice,
+        BlockCache, DataAllocator, DataWriter, Directory, EraseFromDevice, File, FileHandle,
+        FileName, Layout, Meta, Node, NodeHandle, NodeWriter, ReadFromDevice, StaticReadFromDevice,
+        WriteToDevice, directory::DirEntry,
     },
 };
 
@@ -36,7 +38,8 @@ where
     }
 
     pub fn format(device: &mut D) -> Result<(), Error> {
-        Meta::new().write_to_device(device)
+        Meta::new().write_to_device(device)?;
+        DirEntry::root().store(device, 0)
     }
 
     pub fn create(&mut self, file_name: &str, data: &[u8]) -> Result<(), Error>
@@ -48,10 +51,6 @@ where
 
         if file_size > Node::MAX_FILE_SIZE {
             return Err(Error::FileTooLarge);
-        }
-
-        if file_name.len() > MAX_FILENAME_LEN {
-            return Err(Error::FileNameTooLong);
         }
 
         if self.directory.file_exists(&mut self.device, &file_name) {
@@ -71,6 +70,7 @@ where
         let file_name = FileName::new(file_name)?;
 
         let entry = self.directory.find_file(&mut self.device, &file_name)?;
+        println!("found file");
         let node_handle = NodeHandle::new(entry.file_addr());
         let file_handle = FileHandle::new(entry.file_addr());
         let node = node_handle.read_from_device(&mut self.device)?;
@@ -84,7 +84,11 @@ where
         Ok(())
     }
 
-    pub fn entries(&mut self) -> EntryIter<BlockCache<D>> {
-        self.directory.iter(&mut self.device)
+    pub fn count_files(&mut self) -> Result<usize, Error> {
+        self.directory.count_files(&mut self.device)
+    }
+
+    pub fn print_tree(&mut self) -> Result<(), Error> {
+        self.directory.print_tree(&mut self.device)
     }
 }
