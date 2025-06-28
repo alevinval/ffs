@@ -21,6 +21,10 @@ pub struct MemoryDisk {
 }
 
 impl MemoryDisk {
+    pub fn fit(sectors: u32) -> Self {
+        Self::new(512, sectors as usize * 512)
+    }
+
     pub fn new(block_size: usize, capacity: usize) -> Self {
         let data = vec![0u8; capacity].into_boxed_slice();
         Self { block_size, data, pos: 0 }
