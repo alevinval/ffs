@@ -5,13 +5,13 @@ use crate::{
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Entry {
+pub struct FileEntry {
     file_name: FileName,
     file_addr: Addr,
     is_valid: bool,
 }
 
-impl Entry {
+impl FileEntry {
     pub const fn empty() -> Self {
         Self { file_name: FileName::empty(), file_addr: 0, is_valid: false }
     }
@@ -39,17 +39,17 @@ impl Entry {
     }
 }
 
-impl Default for Entry {
+impl Default for FileEntry {
     fn default() -> Self {
         Self::empty()
     }
 }
 
-impl SerdeLen for Entry {
+impl SerdeLen for FileEntry {
     const SERDE_LEN: usize = FileName::SERDE_LEN + 5;
 }
 
-impl Serializable for Entry {
+impl Serializable for FileEntry {
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<usize, Error> {
         let mut n = self.file_name.serialize(writer)?;
         n += writer.write_u32(self.file_addr)?;
@@ -58,12 +58,12 @@ impl Serializable for Entry {
     }
 }
 
-impl Deserializable<Entry> for Entry {
-    fn deserialize<R: Read>(reader: &mut R) -> Result<Entry, Error> {
+impl Deserializable<FileEntry> for FileEntry {
+    fn deserialize<R: Read>(reader: &mut R) -> Result<FileEntry, Error> {
         let file_name = FileName::deserialize(reader)?;
         let file_addr = reader.read_u32()?;
         let is_empty = reader.read_u8()? != 0;
-        Ok(Entry { file_name, file_addr, is_valid: is_empty })
+        Ok(FileEntry { file_name, file_addr, is_valid: is_empty })
     }
 }
 
@@ -78,9 +78,9 @@ mod test {
     fn serde_symmetry() {
         let mut block = Block::new();
 
-        let expected = Entry::new("test_file".into(), 1);
-        assert_eq!(Ok(Entry::SERDE_LEN), expected.serialize(&mut block.writer()));
-        let actual = Entry::deserialize(&mut block.reader()).unwrap();
+        let expected = FileEntry::new("test_file".into(), 1);
+        assert_eq!(Ok(FileEntry::SERDE_LEN), expected.serialize(&mut block.writer()));
+        let actual = FileEntry::deserialize(&mut block.reader()).unwrap();
 
         assert_eq!(expected, actual);
     }

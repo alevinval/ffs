@@ -1,6 +1,6 @@
 pub use directory::Directory;
 pub use directory::EntryIter;
-pub use entry::Entry;
+pub use file_entry::FileEntry;
 
 mod directory;
-mod entry;
+mod file_entry;

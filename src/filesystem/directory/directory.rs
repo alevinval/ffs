@@ -1,7 +1,7 @@
 use crate::{
     Addr, BlockDevice, Error,
     filesystem::{
-        Block, Deserializable, FileName, Layout, MAX_FILES, Serializable, directory::Entry,
+        Block, Deserializable, FileName, Layout, MAX_FILES, Serializable, directory::FileEntry,
     },
 };
 
@@ -11,7 +11,7 @@ pub struct Directory {}
 impl Directory {
     const LEN: usize = MAX_FILES;
 
-    pub fn add_file<D>(&self, device: &mut D, file_name: FileName) -> Result<Entry, Error>
+    pub fn add_file<D>(&self, device: &mut D, file_name: FileName) -> Result<FileEntry, Error>
     where
         D: BlockDevice,
     {
@@ -33,14 +33,14 @@ impl Directory {
         for idx in 0..Self::LEN as Addr {
             let entry = load_entry(device, idx)?;
             if entry.is_valid() && entry.name() == file_name {
-                store_entry(device, idx, &Entry::default())?;
+                store_entry(device, idx, &FileEntry::default())?;
                 return Ok(());
             }
         }
         Err(Error::FileNotFound)
     }
 
-    pub fn find_file<D>(&self, device: &mut D, file_name: &FileName) -> Result<Entry, Error>
+    pub fn find_file<D>(&self, device: &mut D, file_name: &FileName) -> Result<FileEntry, Error>
     where
         D: BlockDevice,
     {
@@ -68,17 +68,17 @@ impl Directory {
     }
 }
 
-fn load_entry<D>(device: &mut D, idx: Addr) -> Result<Entry, Error>
+fn load_entry<D>(device: &mut D, idx: Addr) -> Result<FileEntry, Error>
 where
     D: BlockDevice,
 {
     let mut block = Block::new();
     let sector = Layout::TABLE.nth(idx);
     device.read_block(sector, &mut block)?;
-    Entry::deserialize(&mut block.reader())
+    FileEntry::deserialize(&mut block.reader())
 }
 
-fn store_entry<D>(device: &mut D, idx: Addr, entry: &Entry) -> Result<(), Error>
+fn store_entry<D>(device: &mut D, idx: Addr, entry: &FileEntry) -> Result<(), Error>
 where
     D: BlockDevice,
 {
@@ -101,7 +101,7 @@ impl<'a, D> core::iter::Iterator for EntryIter<'a, D>
 where
     D: BlockDevice,
 {
-    type Item = Entry;
+    type Item = FileEntry;
 
     fn next(&mut self) -> Option<Self::Item> {
         while self.pos < Directory::LEN {
