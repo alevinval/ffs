@@ -29,10 +29,6 @@ impl Node {
         Self { file_len: file_size, block_addrs }
     }
 
-    pub fn file_len(&self) -> u16 {
-        self.file_len
-    }
-
     pub fn block_addrs(&self) -> &[Addr] {
         &self.block_addrs
     }
@@ -78,13 +74,6 @@ mod test {
     #[test]
     fn constants() {
         assert_eq!(12, Node::NODES_PER_BLOCK);
-    }
-
-    #[test]
-    fn getters() {
-        let sut = Node::new(123, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-        assert_eq!(123, sut.file_len());
-        assert_eq!(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10], sut.block_addrs());
     }
 
     #[test]

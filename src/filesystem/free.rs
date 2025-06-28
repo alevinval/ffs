@@ -30,6 +30,7 @@ impl Free {
     }
 
     /// Counts number of free addresses.
+    #[cfg(test)]
     pub fn count_free_addresses(&self) -> u32 {
         let mut n = 0;
         for octet in self.inner.iter() {

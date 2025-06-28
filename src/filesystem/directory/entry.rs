@@ -26,14 +26,6 @@ impl Entry {
         self.is_valid = true;
     }
 
-    pub fn rename(&mut self, new_name: FileName) {
-        self.file_name = new_name;
-    }
-
-    pub fn set_addr(&mut self, new_addr: Addr) {
-        self.file_addr = new_addr;
-    }
-
     pub const fn name(&self) -> &FileName {
         &self.file_name
     }
@@ -44,10 +36,6 @@ impl Entry {
 
     pub const fn file_addr(&self) -> Addr {
         self.file_addr
-    }
-
-    pub const fn file_name(&self) -> &FileName {
-        &self.file_name
     }
 }
 

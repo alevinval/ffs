@@ -1,5 +1,3 @@
-use core::str;
-
 use crate::{
     Addr, BlockDevice, Error,
     filesystem::{Block, Deserializable, FileName, Layout, SerdeLen, Serializable, WriteToDevice},
@@ -15,14 +13,6 @@ pub struct File {
 impl File {
     pub const fn new(name: FileName, addr: Addr) -> Self {
         File { name, addr }
-    }
-
-    pub fn name(&self) -> &FileName {
-        &self.name
-    }
-
-    pub fn name_str(&self) -> &str {
-        self.name.as_str()
     }
 
     pub const fn addr(&self) -> Addr {
@@ -67,12 +57,6 @@ mod test {
     use crate::test_utils::MockDevice;
 
     use super::*;
-
-    #[test]
-    fn name_returns_correct_bytes() {
-        let sut = File::new("abc123".into(), 42);
-        assert_eq!(&FileName::new("abc123").unwrap(), sut.name());
-    }
 
     #[test]
     fn serde_symmetry() {

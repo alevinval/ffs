@@ -43,30 +43,6 @@ impl Directory {
         self.entries.iter().find(|e| e.is_valid() && e.name() == file_name)
     }
 
-    pub fn find_file_mut(&mut self, file_name: &FileName) -> Option<&mut Entry> {
-        self.entries.iter_mut().find(|e| e.is_valid() && e.name() == file_name)
-    }
-
-    pub fn list_files(&self) -> impl Iterator<Item = &Entry> {
-        self.entries.iter().filter(|e| e.is_valid())
-    }
-
-    pub fn rename_file(&mut self, old_name: &FileName, new_name: FileName) -> bool {
-        if let Some(entry) = self.find_file_mut(old_name) {
-            entry.rename(new_name);
-            return true;
-        }
-        false
-    }
-
-    pub fn update_file_addr(&mut self, name: &FileName, new_addr: Addr) -> bool {
-        if let Some(entry) = self.find_file_mut(name) {
-            entry.set_addr(new_addr);
-            return true;
-        }
-        false
-    }
-
     pub fn file_exists(&self, name: &FileName) -> bool {
         self.find_file(name).is_some()
     }

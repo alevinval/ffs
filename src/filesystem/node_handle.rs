@@ -1,10 +1,10 @@
 use crate::{
     Addr, BlockDevice, Error,
-    filesystem::{
-        Block, EraseFromDevice, Layout, ReadFromDevice, SerdeLen, node::Node,
-        node_writer::NodeWriter,
-    },
+    filesystem::{Block, EraseFromDevice, Layout, ReadFromDevice, SerdeLen, node::Node},
 };
+
+#[cfg(test)]
+use crate::filesystem::node_writer::NodeWriter;
 
 const fn byte_offset(addr: Addr) -> usize {
     (addr as usize % Node::NODES_PER_BLOCK) * Node::SERDE_LEN
@@ -23,6 +23,7 @@ impl NodeHandle {
         Self { addr }
     }
 
+    #[cfg(test)]
     pub const fn writer<'a>(&'a self, node: &'a Node) -> NodeWriter<'a> {
         NodeWriter::new(self.addr, node)
     }

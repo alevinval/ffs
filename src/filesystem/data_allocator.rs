@@ -42,7 +42,8 @@ impl DataAllocator {
         }
     }
 
-    pub fn count_free_addresses(&self) -> Addr {
+    #[cfg(test)]
+    fn count_free_addresses(&self) -> Addr {
         self.inner.iter().map(|f| f.count_free_addresses()).sum()
     }
 
