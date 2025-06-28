@@ -113,17 +113,15 @@ impl DataAllocator {
     fn allocate<D: BlockDevice>(&mut self, device: &mut D) -> Result<Addr, Error> {
         let mut block = Block::new();
 
-        for i in self.range.iter() {
-            let logical_addr = (self.last_accessed + i as Addr) % self.range.len();
-            let sector = self.range.nth(logical_addr);
+        for (addr, sector) in self.range.circular_iter(self.last_accessed) {
             device.read_block(sector, &mut block)?;
             let mut free = Free::deserialize(&mut block.reader())?;
 
             if let Some(allocation) = free.allocate() {
                 free.serialize(&mut block.writer())?;
                 device.write_block(sector, &block)?;
-                self.last_accessed = logical_addr;
-                return Ok(to_data_sector(logical_addr, allocation));
+                self.last_accessed = addr;
+                return Ok(to_data_sector(addr, allocation));
             }
         }
         Err(Error::StorageFull)
@@ -177,7 +175,7 @@ mod test {
     const RANGE: Range = Range::new(0, 2);
 
     fn get_sut() -> (MemoryDisk, DataAllocator) {
-        let device = MemoryDisk::fit(RANGE.len());
+        let device = MemoryDisk::fit(RANGE.sector_count());
         let sut = DataAllocator::new(RANGE);
         (device, sut)
     }

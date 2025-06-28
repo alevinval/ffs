@@ -52,11 +52,11 @@ pub struct Layout {}
 /// offsets to logical addresses.
 impl Layout {
     pub const META: Range = Range::new(0, 1);
-    pub const TABLE: Range = Self::META.next(MAX_FILES);
-    pub const FILE: Range = Self::TABLE.next(MAX_FILES);
-    pub const NODE: Range = Self::FILE.next(MAX_FILES);
-    pub const FREE: Range = Self::NODE.next(MAX_DATA_BLOCKS / Free::SLOTS);
-    pub const DATA: Range = Self::FREE.next(MAX_DATA_BLOCKS);
+    pub const TABLE: Range = Self::META.next_range(MAX_FILES, 1);
+    pub const FILE: Range = Self::TABLE.next_range(MAX_FILES, 1);
+    pub const NODE: Range = Self::FILE.next_range(MAX_FILES, 1);
+    pub const FREE: Range = Self::NODE.next_range(MAX_DATA_BLOCKS / Free::SLOTS, 1);
+    pub const DATA: Range = Self::FREE.next_range(MAX_DATA_BLOCKS, 1);
 }
 
 /// Trait for types that have a constant length when serialized/deserialized.
@@ -119,7 +119,7 @@ mod test {
     use super::*;
 
     fn assert_continuous_range(a: Range, b: Range) {
-        assert!(a.end() == b.begin(), "range {a:?} does not end where {b:?} begins");
+        assert!(a.end == b.begin, "range {a:?} does not end where {b:?} begins");
     }
 
     #[test]

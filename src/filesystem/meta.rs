@@ -28,11 +28,11 @@ impl Meta {
 
     pub const fn new() -> Self {
         Meta {
-            table_sector: Layout::TABLE.begin(),
-            file_sector: Layout::FILE.begin(),
-            node_sector: Layout::NODE.begin(),
-            free_sector: Layout::FREE.begin(),
-            data_sector: Layout::DATA.begin(),
+            table_sector: Layout::TABLE.begin,
+            file_sector: Layout::FILE.begin,
+            node_sector: Layout::NODE.begin,
+            free_sector: Layout::FREE.begin,
+            data_sector: Layout::DATA.begin,
             block_size: Block::LEN as u16,
             signature: Self::SIGNATURE,
         }
@@ -89,7 +89,7 @@ where
         let mut block = Block::new();
         self.serialize(&mut block.writer())?;
 
-        let sector = Layout::META.begin();
+        let sector = Layout::META.begin;
         out.write_block(sector, &block)
     }
 }
@@ -112,7 +112,7 @@ where
     D: BlockDevice,
 {
     fn erase_from_device(&self, device: &mut D) -> Result<(), Error> {
-        device.write_block(Layout::META.begin(), &Block::new())
+        device.write_block(Layout::META.begin, &Block::new())
     }
 }
 
