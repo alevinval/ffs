@@ -10,9 +10,9 @@ use crate::{
 };
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct Directory {}
+pub struct DirTree {}
 
-impl Directory {
+impl DirTree {
     pub fn insert<D>(&self, device: &mut D, file_path: &str) -> Result<FileEntry, Error>
     where
         D: BlockDevice,
@@ -142,7 +142,7 @@ fn insert_file<D: BlockDevice>(
 }
 
 fn find_free_addr_for_direntry<D: BlockDevice>(device: &mut D) -> Result<Addr, Error> {
-    for (addr, _) in Layout::BTREE.iter().skip(1) {
+    for (addr, _) in Layout::TREE.iter().skip(1) {
         let entry = DirEntry::load(device, addr)?;
         if entry.name.is_empty() {
             return Ok(addr);

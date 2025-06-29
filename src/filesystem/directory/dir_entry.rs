@@ -29,7 +29,7 @@ impl DirEntry {
     }
 
     pub fn load<D: BlockDevice>(device: &mut D, idx: Addr) -> Result<DirEntry, Error> {
-        let range = Layout::BTREE;
+        let range = Layout::TREE;
         let mut buffer = [0u8; DirEntry::SERDE_BUFFER_LEN];
         let start_sector = range.nth(idx);
 
@@ -45,7 +45,7 @@ impl DirEntry {
     where
         D: BlockDevice,
     {
-        let range = Layout::BTREE;
+        let range = Layout::TREE;
         let start_sector = range.nth(idx);
         let mut buffer = [0u8; DirEntry::SERDE_BUFFER_LEN];
         let mut writer = Writer::new(&mut buffer);

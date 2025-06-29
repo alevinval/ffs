@@ -10,7 +10,7 @@ use block::Block;
 use cache::BlockCache;
 use data_allocator::DataAllocator;
 use data_writer::DataWriter;
-use directory::Directory;
+use directory::DirTree;
 use file::File;
 use file_handle::FileHandle;
 use file_name::FileName;
@@ -40,11 +40,11 @@ mod range;
 
 pub type Addr = u32; // Logical address type for sectors/blocks. Change here to update everywhere.
 
-/// Maximum number of entries in the B-tree used for directory entries.
-const MAX_BTREE_ENTRIES: usize = 50;
+/// Maximum number of entries in the n-tree used for keeping the directory structure.
+const MAX_TREE_ENTRIES: usize = 50;
 
 /// Maximum number of files in the file system
-const MAX_FILES: usize = MAX_BTREE_ENTRIES * DirEntry::MAX_CHILD_FILES;
+const MAX_FILES: usize = MAX_TREE_ENTRIES * DirEntry::MAX_CHILD_FILES;
 
 /// Maximum number of data blocks in the file system.
 const MAX_DATA_BLOCKS: usize = Node::BLOCKS_PER_NODE * MAX_FILES;
@@ -58,8 +58,8 @@ pub struct Layout {}
 /// offsets to logical addresses.
 impl Layout {
     pub const META: Range = Range::new(0, 1);
-    pub const BTREE: Range = Self::META.next_range(MAX_BTREE_ENTRIES, DirEntry::SERDE_BLOCK_COUNT);
-    pub const FILE: Range = Self::BTREE.next_range(MAX_FILES, 1);
+    pub const TREE: Range = Self::META.next_range(MAX_TREE_ENTRIES, DirEntry::SERDE_BLOCK_COUNT);
+    pub const FILE: Range = Self::TREE.next_range(MAX_FILES, 1);
     pub const NODE: Range = Self::FILE.next_range(MAX_FILES, 1);
     pub const FREE: Range = Self::NODE.next_range(MAX_DATA_BLOCKS / Free::SLOTS, 1);
     pub const DATA: Range = Self::FREE.next_range(MAX_DATA_BLOCKS, 1);
@@ -132,8 +132,8 @@ mod test {
 
     #[test]
     fn ranges_layout() {
-        assert_continuous_range(Layout::META, Layout::BTREE);
-        assert_continuous_range(Layout::BTREE, Layout::FILE);
+        assert_continuous_range(Layout::META, Layout::TREE);
+        assert_continuous_range(Layout::TREE, Layout::FILE);
         assert_continuous_range(Layout::FILE, Layout::NODE);
         assert_continuous_range(Layout::NODE, Layout::FREE);
         assert_continuous_range(Layout::FREE, Layout::DATA);

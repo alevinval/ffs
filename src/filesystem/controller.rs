@@ -1,7 +1,7 @@
 use crate::{
     BlockDevice, Error,
     filesystem::{
-        BlockCache, DataAllocator, DataWriter, DirEntry, Directory, EraseFromDevice, File,
+        BlockCache, DataAllocator, DataWriter, DirEntry, DirTree, EraseFromDevice, File,
         FileHandle, Layout, Meta, Node, NodeHandle, NodeWriter, ReadFromDevice,
         StaticReadFromDevice, WriteToDevice, path,
     },
@@ -13,7 +13,7 @@ where
     D: BlockDevice,
 {
     device: BlockCache<D>,
-    directory: Directory,
+    directory: DirTree,
     data_allocator: DataAllocator,
 }
 
@@ -25,7 +25,7 @@ where
         if Meta::read_from_device(&mut device)? != Meta::new() {
             return Err(Error::Unsupported);
         }
-        let directory = Directory {};
+        let directory = DirTree {};
         let data_allocator = DataAllocator::new(Layout::FREE);
         let device = BlockCache::mount(device);
         Ok(Controller { device, directory, data_allocator })
