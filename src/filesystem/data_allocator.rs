@@ -58,7 +58,7 @@ impl DataAllocator {
         file_size: usize,
         out: &mut [Addr],
     ) -> Result<(), Error> {
-        self.allocate_n(device, file_size / Block::LEN, out)
+        self.allocate_n(device, file_size.div_ceil(Block::LEN), out)
     }
 
     /// Attempts to allocate `n` blocks and stores the allocated indices in the provided `buffer`.
@@ -190,6 +190,25 @@ mod test {
             last = sut.allocate(device);
         }
         last
+    }
+
+    #[test]
+    fn allocate_bytes() {
+        let (mut device, mut sut) = get_sut();
+        sut.allocate(&mut device).unwrap();
+
+        let mut out = [0; 4];
+        sut.allocate_bytes(&mut device, 1, &mut out).unwrap();
+        assert_eq!([1, 0, 0, 0], out);
+
+        sut.allocate_bytes(&mut device, 128, &mut out).unwrap();
+        assert_eq!([2, 0, 0, 0], out);
+
+        sut.allocate_bytes(&mut device, 512, &mut out).unwrap();
+        assert_eq!([3, 0, 0, 0], out);
+
+        sut.allocate_bytes(&mut device, 1500, &mut out).unwrap();
+        assert_eq!([4, 5, 6, 0], out);
     }
 
     #[test]

@@ -28,8 +28,8 @@ fn create_file() {
         assert_eq!(1, ctrl.entries().count());
     });
 
-    assert_eq!(3074, device.reads_count);
-    assert_eq!(5, device.writes_count)
+    assert_eq!(3075, device.reads_count);
+    assert_eq!(6, device.writes_count)
 }
 
 #[test]
@@ -44,8 +44,8 @@ fn create_then_delete_file() {
         assert_eq!(0, ctrl.entries().count());
     });
 
-    assert_eq!(3077, device.reads_count);
-    assert_eq!(18, device.writes_count)
+    assert_eq!(3078, device.reads_count);
+    assert_eq!(19, device.writes_count)
 }
 
 #[test]
@@ -84,8 +84,8 @@ fn create_more_than_max_files() {
         }
     });
 
-    assert_eq!(1576421, device.reads_count);
-    assert_eq!(4097, device.writes_count);
+    assert_eq!(1577452, device.reads_count);
+    assert_eq!(5121, device.writes_count);
 }
 
 #[test]
@@ -97,8 +97,8 @@ fn create_file_twice_fails() {
         assert_eq!(Error::FileAlreadyExists, ctrl.create(FILE_NAME, DATA_FIXTURE).unwrap_err(),);
     });
 
-    assert_eq!(1029, device.reads_count);
-    assert_eq!(5, device.writes_count);
+    assert_eq!(1030, device.reads_count);
+    assert_eq!(6, device.writes_count);
 }
 
 #[test]
