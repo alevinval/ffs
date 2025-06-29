@@ -17,7 +17,7 @@ fn mount_device_formatted() {
     let device = sut.unmount();
 
     assert_eq!(1, device.reads_count);
-    assert_eq!(5, device.writes_count);
+    assert_eq!(4, device.writes_count);
 }
 
 #[test]
@@ -28,8 +28,8 @@ fn create_file() {
         assert_eq!(Ok(1), ctrl.count_files());
     });
 
-    assert_eq!(27, device.reads_count);
-    assert_eq!(29, device.writes_count)
+    assert_eq!(21, device.reads_count);
+    assert_eq!(23, device.writes_count)
 }
 
 #[test]
@@ -44,8 +44,8 @@ fn create_then_delete_file() {
         assert_eq!(Ok(0), ctrl.count_files());
     });
 
-    assert_eq!(66, device.reads_count);
-    assert_eq!(45, device.writes_count)
+    assert_eq!(51, device.reads_count);
+    assert_eq!(38, device.writes_count)
 }
 
 #[test]
@@ -56,7 +56,7 @@ fn create_file_with_long_name_fails() {
     });
 
     assert_eq!(1, device.reads_count);
-    assert_eq!(5, device.writes_count);
+    assert_eq!(4, device.writes_count);
 }
 
 #[test]
@@ -67,7 +67,7 @@ fn create_file_with_data_too_big() {
     });
 
     assert_eq!(1, device.reads_count);
-    assert_eq!(5, device.writes_count);
+    assert_eq!(4, device.writes_count);
 }
 
 #[test]
@@ -95,8 +95,8 @@ fn create_max_files() {
         }
     });
 
-    assert_eq!(48147, device.reads_count);
-    assert_eq!(8533, device.writes_count);
+    assert_eq!(36615, device.reads_count);
+    assert_eq!(7425, device.writes_count);
 }
 
 #[test]
@@ -112,8 +112,8 @@ fn create_file_twice_fails() {
         );
     });
 
-    assert_eq!(28, device.reads_count);
-    assert_eq!(29, device.writes_count);
+    assert_eq!(22, device.reads_count);
+    assert_eq!(23, device.writes_count);
 }
 
 #[test]
@@ -122,8 +122,8 @@ fn delete_file_that_does_not_exist() {
         assert_eq!(Error::FileNotFound, ctrl.delete(FILE_NAME).unwrap_err());
     });
 
-    assert_eq!(5, device.reads_count);
-    assert_eq!(5, device.writes_count);
+    assert_eq!(4, device.reads_count);
+    assert_eq!(4, device.writes_count);
 }
 
 fn device() -> MemoryDisk {

@@ -50,7 +50,7 @@ const MAX_FILES: usize = MAX_BTREE_ENTRIES * DirEntry::MAX_CHILD_FILES;
 const MAX_DATA_BLOCKS: usize = Node::BLOCKS_PER_NODE * MAX_FILES;
 
 /// Maximum length of a file name in bytes.
-const MAX_FILENAME_LEN: usize = 63;
+const MAX_FILENAME_LEN: usize = 47;
 
 pub struct Layout {}
 
