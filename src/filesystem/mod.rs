@@ -35,6 +35,7 @@ mod meta;
 mod node;
 mod node_handle;
 mod node_writer;
+pub mod path;
 mod range;
 
 pub type Addr = u32; // Logical address type for sectors/blocks. Change here to update everywhere.

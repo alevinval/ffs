@@ -19,11 +19,7 @@ impl DirEntry {
     pub const MAX_CHILD_DIRS: usize = 16;
 
     pub fn root() -> Self {
-        Self {
-            name: FileName::new("").unwrap(),
-            dirs: [const { 0 }; Self::MAX_CHILD_DIRS],
-            files: [const { FileEntry::empty() }; Self::MAX_CHILD_FILES],
-        }
+        Self::new("".into())
     }
 
     pub const fn new(name: FileName) -> Self {

@@ -5,6 +5,7 @@ use crate::{
     filesystem::{
         FileName, Layout,
         directory::{DirEntry, FileEntry},
+        path,
     },
 };
 
@@ -12,25 +13,25 @@ use crate::{
 pub struct Directory {}
 
 impl Directory {
-    pub fn insert<D>(&self, device: &mut D, path: FileName) -> Result<FileEntry, Error>
+    pub fn insert<D>(&self, device: &mut D, file_path: &str) -> Result<FileEntry, Error>
     where
         D: BlockDevice,
     {
-        insert_file(device, path, 0)
+        insert_file(device, file_path, 0)
     }
 
-    pub fn remove<D>(&self, device: &mut D, path: FileName) -> Result<(), Error>
+    pub fn remove<D>(&self, device: &mut D, file_path: &str) -> Result<(), Error>
     where
         D: BlockDevice,
     {
-        remove_file(device, path, 0)
+        remove_file(device, file_path, 0)
     }
 
-    pub fn get<D>(&self, device: &mut D, path: FileName) -> Result<FileEntry, Error>
+    pub fn get<D>(&self, device: &mut D, file_path: &str) -> Result<FileEntry, Error>
     where
         D: BlockDevice,
     {
-        find_file(device, path, 0)
+        find_file(device, file_path, 0)
     }
 
     pub fn count_files<D>(&self, device: &mut D) -> Result<usize, Error>
@@ -44,15 +45,15 @@ impl Directory {
     where
         D: BlockDevice,
     {
-        print_tree_inner(device, 0, FileName::empty(), 0, 0)
+        print_tree_inner(device, 0, 0, 0)
     }
 }
 
-fn remove_file<D: BlockDevice>(device: &mut D, path: FileName, addr: Addr) -> Result<(), Error> {
+fn remove_file<D: BlockDevice>(device: &mut D, file_path: &str, addr: Addr) -> Result<(), Error> {
     let mut current = DirEntry::load(device, addr)?;
-    if path.dirname() == current.name {
+    if path::dirname(file_path) == current.name {
         if let Some(file) =
-            current.files.iter_mut().find(|f| f.is_valid() && f.name() == path.basename())
+            current.files.iter_mut().find(|f| f.is_valid() && f.name() == path::basename(file_path))
         {
             *file = FileEntry::empty();
             current.store(device, addr)?;
@@ -63,7 +64,7 @@ fn remove_file<D: BlockDevice>(device: &mut D, path: FileName, addr: Addr) -> Re
 
     let is_root = addr == 0;
     for next_addr in current.dirs.into_iter().filter(|addr| *addr != 0) {
-        let next_path = if is_root { path } else { path.tail() };
+        let next_path = if is_root { file_path } else { path::tail(file_path) };
         if remove_file(device, next_path, next_addr).is_ok() {
             return Ok(());
         }
@@ -73,13 +74,13 @@ fn remove_file<D: BlockDevice>(device: &mut D, path: FileName, addr: Addr) -> Re
 
 fn find_file<D: BlockDevice>(
     device: &mut D,
-    path: FileName,
+    file_path: &str,
     addr: Addr,
 ) -> Result<FileEntry, Error> {
     let mut current = DirEntry::load(device, addr)?;
-    if path.dirname() == current.name {
+    if path::dirname(file_path) == current.name {
         if let Some(file) =
-            current.files.iter_mut().find(|f| f.is_valid() && f.name() == path.basename())
+            current.files.iter_mut().find(|f| f.is_valid() && f.name() == path::basename(file_path))
         {
             return Ok(file.clone());
         }
@@ -88,7 +89,7 @@ fn find_file<D: BlockDevice>(
 
     let is_root = addr == 0;
     for next_addr in current.dirs.into_iter().filter(|addr| *addr != 0) {
-        let next_path = if is_root { path } else { path.tail() };
+        let next_path = if is_root { file_path } else { path::tail(file_path) };
         if let Ok(file) = find_file(device, next_path, next_addr) {
             return Ok(file.clone());
         }
@@ -98,31 +99,32 @@ fn find_file<D: BlockDevice>(
 
 fn insert_file<D: BlockDevice>(
     device: &mut D,
-    path: FileName,
+    file_path: &str,
     addr: Addr,
 ) -> Result<FileEntry, Error> {
     let mut current = DirEntry::load(device, addr)?;
 
     // No directory left, do file insertion on the current entry.
-    if path.dirname().is_empty() {
-        if current.files.iter().any(|e| e.name() == path) {
+    if path::dirname(file_path).is_empty() {
+        if current.files.iter().any(|e| e.name() == file_path) {
             return Err(Error::FileAlreadyExists);
         }
 
         let pos = current.files.iter_mut().position(|f| !f.is_valid()).ok_or(Error::StorageFull)?;
         let file_addr = addr * DirEntry::MAX_CHILD_FILES as Addr + pos as Addr;
-        let file_entry = FileEntry::new(path, file_addr);
+        let file_name = FileName::new(file_path)?;
+        let file_entry = FileEntry::new(file_name, file_addr);
         current.files[pos] = file_entry.clone();
         current.store(device, addr)?;
         return Ok(file_entry);
     }
 
     // Otherwise, check the children directories to see if we need to follow it.
-    let first_component = path.first_component();
+    let first_component = path::first_component(file_path);
     for next_addr in current.dirs.into_iter().filter(|a| *a != 0) {
         let dir = DirEntry::load(device, next_addr)?;
         if dir.name == first_component {
-            return insert_file(device, path.tail(), next_addr);
+            return insert_file(device, path::tail(file_path), next_addr);
         }
     }
 
@@ -136,7 +138,7 @@ fn insert_file<D: BlockDevice>(
     // Persist current entry, and continue insertion in the new directory.
     *dir_pointer = next_addr;
     current.store(device, addr)?;
-    insert_file(device, path.tail(), next_addr)
+    insert_file(device, path::tail(file_path), next_addr)
 }
 
 fn find_free_addr_for_direntry<D: BlockDevice>(device: &mut D) -> Result<Addr, Error> {
@@ -152,7 +154,6 @@ fn find_free_addr_for_direntry<D: BlockDevice>(device: &mut D) -> Result<Addr, E
 fn print_tree_inner<D: BlockDevice>(
     device: &mut D,
     addr: Addr,
-    acc: FileName,
     depth: usize,
     max_depth: usize,
 ) -> Result<(), Error> {
@@ -160,13 +161,11 @@ fn print_tree_inner<D: BlockDevice>(
         return Ok(());
     }
 
-    let sep = FileName::new("/").unwrap();
     let current_node = DirEntry::load(device, addr)?;
-    let acc = acc + current_node.name + sep;
 
     println!("{}{}/", "  ".repeat(depth), current_node.name.as_str());
     for child_idx in current_node.dirs.iter().filter(|a| **a != 0) {
-        print_tree_inner(device, *child_idx, acc, depth + 1, max_depth)?
+        print_tree_inner(device, *child_idx, depth + 1, max_depth)?
     }
 
     for entry in current_node.files.iter().filter(|e| e.is_valid()) {

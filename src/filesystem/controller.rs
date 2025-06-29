@@ -1,9 +1,9 @@
 use crate::{
     BlockDevice, Error,
     filesystem::{
-        BlockCache, DataAllocator, DataWriter, Directory, EraseFromDevice, File, FileHandle,
-        FileName, Layout, Meta, Node, NodeHandle, NodeWriter, ReadFromDevice, StaticReadFromDevice,
-        WriteToDevice, directory::DirEntry,
+        BlockCache, DataAllocator, DataWriter, DirEntry, Directory, EraseFromDevice, File,
+        FileHandle, Layout, Meta, Node, NodeHandle, NodeWriter, ReadFromDevice,
+        StaticReadFromDevice, WriteToDevice, path,
     },
 };
 
@@ -40,19 +40,19 @@ where
         DirEntry::root().store(device, 0)
     }
 
-    pub fn create(&mut self, file_name: &str, data: &[u8]) -> Result<(), Error>
+    pub fn create(&mut self, file_path: &str, data: &[u8]) -> Result<(), Error>
     where
         D: BlockDevice,
     {
-        let file_name = FileName::new(file_name)?;
-        let file_size = data.len();
+        path::validate(file_path)?;
 
+        let file_size = data.len();
         if file_size > Node::MAX_FILE_SIZE {
             return Err(Error::FileTooLarge);
         }
 
-        let entry = self.directory.insert(&mut self.device, file_name)?;
-        let file = File::new(file_name, entry.file_addr());
+        let entry = self.directory.insert(&mut self.device, file_path)?;
+        let file = File::new(*entry.name(), entry.file_addr());
         let node = self.data_allocator.allocate_node_data(&mut self.device, file_size)?;
         DataWriter::new(node.block_addrs(), data).write_to_device(&mut self.device)?;
         NodeWriter::new(file.addr(), &node).write_to_device(&mut self.device)?;
@@ -60,17 +60,17 @@ where
         Ok(())
     }
 
-    pub fn delete(&mut self, file_name: &str) -> Result<(), Error> {
-        let file_name = FileName::new(file_name)?;
+    pub fn delete(&mut self, file_path: &str) -> Result<(), Error> {
+        path::validate(file_path)?;
 
-        let entry = self.directory.get(&mut self.device, file_name)?;
+        let entry = self.directory.get(&mut self.device, file_path)?;
         let node_handle = NodeHandle::new(entry.file_addr());
         let file_handle = FileHandle::new(entry.file_addr());
         let node = node_handle.read_from_device(&mut self.device)?;
 
         node_handle.erase_from_device(&mut self.device)?;
         file_handle.erase_from_device(&mut self.device)?;
-        self.directory.remove(&mut self.device, file_name)?;
+        self.directory.remove(&mut self.device, file_path)?;
 
         // Release data blocks only after metadata is fully erased.
         self.data_allocator.release_node_data(&mut self.device, &node)?;

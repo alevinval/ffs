@@ -5,12 +5,10 @@
 //! [`FileName`] to ensure that file names are always valid and conform to the
 //! maximum length constraint.
 
-use core::ops::Add;
-
 use crate::{
     Error,
-    filesystem::{Deserializable, MAX_FILENAME_LEN, SerdeLen, Serializable},
-    io::{Read, Write, Writer},
+    filesystem::{Deserializable, MAX_FILENAME_LEN, SerdeLen, Serializable, path},
+    io::{Read, Write},
 };
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -30,8 +28,7 @@ impl FileName {
     /// Returns an error if the provided name exceeds the maximum length of
     /// [`MAX_FILENAME_LEN`].
     pub fn new(name: &str) -> Result<Self, Error> {
-        let name = canonicalize(name);
-
+        let name = path::norm(name);
         if name.len() > MAX_FILENAME_LEN {
             return Err(Error::FileNameTooLong);
         }
@@ -65,55 +62,6 @@ impl FileName {
     /// Creates a new empty buffer to store a file name.
     const fn buffer() -> [u8; MAX_FILENAME_LEN] {
         [0u8; MAX_FILENAME_LEN]
-    }
-
-    /// Returns the directory name preceding the file name.
-    pub fn dirname(&self) -> &str {
-        self.as_str().rsplit_once('/').map(|(dirname, _)| dirname).unwrap_or_default()
-    }
-
-    /// Returns the file name without the directory part.
-    pub fn basename(&self) -> &str {
-        let str = self.as_str();
-        str.rsplit_once('/').map(|(_, basename)| basename).unwrap_or(str)
-    }
-
-    /// Returns a new [`FileName`] that represents the inner path after the first component.
-    pub fn tail(&self) -> Self {
-        if self.basename().is_empty() {
-            return *self;
-        }
-
-        let first = self.first_component();
-        FileName::new(self.as_str().strip_prefix(first).unwrap()).unwrap()
-    }
-
-    /// Returns the first component of the file name, which is the part before the first slash.
-    pub fn first_component(&self) -> &str {
-        self.as_str().split('/').next().unwrap_or("")
-    }
-}
-
-fn canonicalize(file_name: &str) -> &str {
-    file_name.trim_start_matches('/').trim_end_matches('/')
-}
-
-impl Add for FileName {
-    type Output = Self;
-
-    fn add(self, other: Self) -> Self::Output {
-        let new_len = self.len + other.len + 1;
-        if new_len > MAX_FILENAME_LEN {
-            panic!("filename addition exceeds maximum length");
-        }
-
-        let mut bytes = [0u8; MAX_FILENAME_LEN];
-        let mut writer = Writer::new(&mut bytes);
-        writer.write(self.as_bytes()).unwrap();
-        writer.write_u8(b'/').unwrap();
-        writer.write(other.as_bytes()).unwrap();
-
-        Self { bytes, len: new_len }
     }
 }
 
@@ -166,7 +114,6 @@ impl PartialEq<FileName> for &str {
     }
 }
 
-#[cfg(test)]
 impl From<&str> for FileName {
     fn from(name: &str) -> Self {
         Self::new(name).expect("FileName::from should not fail with valid input")
@@ -237,40 +184,5 @@ mod tests {
         let name = "valid_name";
         let sut = FileName::new(name).unwrap();
         assert_eq!(name, sut.as_str());
-    }
-
-    #[test]
-    fn basename_and_dirname() {
-        let name = FileName::new("/path/to/file.txt").unwrap();
-        assert_eq!("path/to", name.dirname());
-        assert_eq!("file.txt", name.basename());
-
-        let name = FileName::new("file.txt").unwrap();
-        assert_eq!("", name.dirname());
-        assert_eq!("file.txt", name.basename());
-
-        let name = FileName::new("/").unwrap();
-        assert_eq!("", name.dirname());
-        assert_eq!("", name.basename());
-
-        let name = FileName::new("").unwrap();
-        assert_eq!("", name.dirname());
-        assert_eq!("", name.basename());
-    }
-
-    #[test]
-    fn tail_path() {
-        let input = FileName::new("foo/bar/baz").unwrap();
-        let tail = input.tail();
-        assert_eq!("bar/baz", tail.as_str());
-        assert_eq!("baz", tail.tail().as_str());
-    }
-
-    #[test]
-    fn addition() {
-        let first = FileName::new("/foo").unwrap();
-        let second = FileName::new("/bar/baz").unwrap();
-        let addition = first + second;
-        assert_eq!("foo/bar/baz", addition.as_str());
     }
 }
