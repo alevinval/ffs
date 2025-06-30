@@ -1,6 +1,6 @@
 use std::vec::Vec;
 
-use crate::{Addr, BlockDevice, Error};
+use crate::{BlockDevice, Error, filesystem::Addr};
 
 pub struct MockDevice {
     pub reads: Vec<(Addr, Vec<u8>)>,

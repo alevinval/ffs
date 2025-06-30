@@ -3,16 +3,26 @@
 #[cfg(feature = "std")]
 extern crate std;
 
-pub(crate) use filesystem::Addr;
-
-pub use filesystem::{BlockDevice, Controller, DirEntry};
-
-pub mod disk;
-mod filesystem;
-pub mod io;
-
 #[cfg(test)]
 pub(crate) mod test_utils;
+
+pub use filesystem::{BlockDevice, Controller};
+
+use filesystem::{DirEntry, Name};
+
+#[cfg(feature = "test-support")]
+pub mod disk;
+
+mod filesystem;
+mod io;
+
+pub struct Constants {}
+
+impl Constants {
+    pub const MAX_FILE_NAME_LEN: usize = Name::MAX_LEN;
+    pub const MAX_CHILD_DIRS: usize = DirEntry::MAX_CHILD_DIRS;
+    pub const MAX_CHILD_FILES: usize = DirEntry::MAX_CHILD_FILES;
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Error {

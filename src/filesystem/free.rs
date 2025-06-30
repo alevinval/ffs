@@ -6,7 +6,7 @@ use crate::{
 
 /// Tracks the free status of an address space.
 #[derive(PartialEq, Eq, Debug)]
-pub(crate) struct Free {
+pub struct Free {
     inner: Block,
     last_free: usize,
 }
@@ -30,13 +30,12 @@ impl Free {
     }
 
     /// Counts number of free addresses.
-    #[cfg(test)]
-    pub fn count_free_addresses(&self) -> Addr {
+    pub fn count_free_addresses(&self) -> usize {
         let mut n = 0;
         for octet in self.inner.iter() {
-            n += u8::count_zeros(*octet);
+            n += u8::count_zeros(*octet) as usize;
         }
-        n as Addr
+        n
     }
 
     /// Attempts to allocate the first available address.
@@ -90,7 +89,7 @@ impl Serializable for Free {
     }
 }
 
-impl Deserializable<Free> for Free {
+impl Deserializable<Self> for Free {
     /// Deserializes a [`Free`] instance from the given byte slice.
     ///
     /// This method copies the first [`Block::LEN`] bytes of `buf` into `[Self::inner]`

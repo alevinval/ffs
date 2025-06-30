@@ -1,9 +1,16 @@
 use crate::{
     BlockDevice, Error,
     filesystem::{
-        BlockCache, DataAllocator, DataWriter, DirEntry, DirTree, EraseFromDevice, File,
-        FileHandle, Layout, Meta, Node, NodeHandle, NodeWriter, ReadFromDevice,
-        StaticReadFromDevice, WriteToDevice, path,
+        EraseFrom, Layout, LoadFrom, LoadFromStatic, Store,
+        cache::BlockCache,
+        data_allocator::DataAllocator,
+        data_writer::DataWriter,
+        directory::{DirEntry, DirTree},
+        file::File,
+        meta::Meta,
+        node::Node,
+        node_writer::NodeWriter,
+        path,
     },
 };
 
@@ -21,14 +28,14 @@ impl<D> Controller<D>
 where
     D: BlockDevice,
 {
-    pub fn mount(mut device: D) -> Result<Controller<D>, Error> {
-        if Meta::read_from_device(&mut device)? != Meta::new() {
+    pub fn mount(mut device: D) -> Result<Self, Error> {
+        if Meta::load_from(&mut device)? != Meta::new() {
             return Err(Error::Unsupported);
         }
         let directory = DirTree {};
         let data_allocator = DataAllocator::new(Layout::FREE);
         let device = BlockCache::mount(device);
-        Ok(Controller { device, directory, data_allocator })
+        Ok(Self { device, directory, data_allocator })
     }
 
     pub fn unmount(self) -> D {
@@ -36,7 +43,7 @@ where
     }
 
     pub fn format(device: &mut D) -> Result<(), Error> {
-        Meta::new().write_to_device(device)?;
+        Meta::new().store(device)?;
         DirEntry::root().store(device, 0)
     }
 
@@ -51,26 +58,25 @@ where
             return Err(Error::FileTooLarge);
         }
 
-        let entry = self.directory.insert(&mut self.device, file_path)?;
-        let file = File::new(*entry.name(), entry.file_addr());
+        let file_ref = self.directory.insert_file(&mut self.device, file_path)?;
+        let file = File::new(*file_ref.name(), file_ref.addr());
         let node = self.data_allocator.allocate_node_data(&mut self.device, file_size)?;
-        DataWriter::new(node.block_addrs(), data).write_to_device(&mut self.device)?;
-        NodeWriter::new(file.addr(), &node).write_to_device(&mut self.device)?;
-        file.write_to_device(&mut self.device)?;
+        DataWriter::new(node.block_addrs(), data).store(&mut self.device)?;
+        NodeWriter::new(file.node_addr(), &node).store(&mut self.device)?;
+        file.store(&mut self.device)?;
         Ok(())
     }
 
     pub fn delete(&mut self, file_path: &str) -> Result<(), Error> {
         path::validate(file_path)?;
 
-        let entry = self.directory.get(&mut self.device, file_path)?;
-        let node_handle = NodeHandle::new(entry.file_addr());
-        let file_handle = FileHandle::new(entry.file_addr());
-        let node = node_handle.read_from_device(&mut self.device)?;
+        let file_ref = self.directory.get_file(&mut self.device, file_path)?;
+        let (file_handle, node_handle) = file_ref.get_handles();
+        let node = node_handle.load_from(&mut self.device)?;
 
-        node_handle.erase_from_device(&mut self.device)?;
-        file_handle.erase_from_device(&mut self.device)?;
-        self.directory.remove(&mut self.device, file_path)?;
+        node_handle.erase_from(&mut self.device)?;
+        file_handle.erase_from(&mut self.device)?;
+        self.directory.remove_file(&mut self.device, file_path)?;
 
         // Release data blocks only after metadata is fully erased.
         self.data_allocator.release_node_data(&mut self.device, &node)?;
@@ -81,6 +87,11 @@ where
         self.directory.count_files(&mut self.device)
     }
 
+    pub fn free_data_blocks(&mut self) -> Result<usize, Error> {
+        self.data_allocator.count_free_addresses(&mut self.device)
+    }
+
+    #[cfg(feature = "std")]
     pub fn print_tree(&mut self) -> Result<(), Error> {
         self.directory.print_tree(&mut self.device)
     }

@@ -4,9 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
-default = ["std"]
+default = ["std", "test-support"]
 std = []
 debug = []
+test-support = []
 
 [lib]
 path = "src/lib.rs"
@@ -15,5 +16,6 @@ path = "src/lib.rs"
 [[bin]]
 name = "ffs"
 path = "src/bin/main.rs"
+features = ["std", "test-support"]
 
 [dependencies]

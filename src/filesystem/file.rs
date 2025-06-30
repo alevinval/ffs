@@ -1,51 +1,59 @@
 use crate::{
-    Addr, BlockDevice, Error,
-    filesystem::{Block, Deserializable, FileName, Layout, SerdeLen, Serializable, WriteToDevice},
+    BlockDevice, Error,
+    filesystem::{
+        Addr, Addressable, Block, Deserializable, Layout, Name, SerdeLen, Serializable, Store,
+    },
     io::{Read, Write},
 };
 
 #[derive(Eq, PartialEq, Debug, Clone)]
 pub struct File {
-    name: FileName,
-    addr: Addr,
+    name: Name,
+    node_addr: Addr,
 }
 
 impl File {
-    pub const fn new(name: FileName, addr: Addr) -> Self {
-        File { name, addr }
+    pub const fn new(name: Name, node_addr: Addr) -> Self {
+        Self { name, node_addr }
     }
 
-    pub const fn addr(&self) -> Addr {
-        self.addr
+    pub const fn node_addr(&self) -> Addr {
+        self.node_addr
     }
 }
 
 impl SerdeLen for File {
-    const SERDE_LEN: usize = 4 + FileName::SERDE_LEN;
+    const SERDE_LEN: usize = 4 + Name::SERDE_LEN;
 }
 
 impl Serializable for File {
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<usize, Error> {
-        let mut n = writer.write_u32(self.addr)?;
+        let mut n = writer.write_addr(self.node_addr)?;
         n += self.name.serialize(writer)?;
         Ok(n)
     }
 }
 
-impl Deserializable<File> for File {
-    fn deserialize<R: Read>(reader: &mut R) -> Result<File, Error> {
-        let addr = reader.read_u32()?;
-        let name = FileName::deserialize(reader)?;
-        Ok(File { name, addr })
+impl Deserializable<Self> for File {
+    fn deserialize<R: Read>(reader: &mut R) -> Result<Self, Error> {
+        let node_addr = reader.read_addr()?;
+        let name = Name::deserialize(reader)?;
+        Ok(Self { name, node_addr })
     }
 }
 
-impl<D> WriteToDevice<D> for File
+impl Addressable for File {
+    fn layout() -> Layout {
+        Layout::FILE
+    }
+}
+
+impl<D> Store<D> for File
 where
     D: BlockDevice,
 {
-    fn write_to_device(&self, out: &mut D) -> Result<(), Error> {
-        let sector = Layout::FILE.nth(self.addr);
+    fn store(&self, out: &mut D) -> Result<(), Error> {
+        let sector = Layout::FILE.nth(self.node_addr);
         let mut block = Block::new();
         self.serialize(&mut block.writer())?;
         out.write_block(sector, &block)
@@ -73,7 +81,7 @@ mod test {
     fn write_to_device() -> Result<(), Error> {
         let mut out = MockDevice::new();
         let sut = File::new("some-file.txt".into(), 123);
-        sut.write_to_device(&mut out)?;
+        sut.store(&mut out)?;
 
         let mut expected = Block::new();
         sut.serialize(&mut expected.writer())?;

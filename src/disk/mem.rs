@@ -24,7 +24,7 @@ pub struct MemoryDisk {
 }
 
 impl MemoryDisk {
-    pub fn fit(sectors: u32) -> Self {
+    pub fn fit(sectors: Addr) -> Self {
         Self::new(512, sectors as usize * 512)
     }
 

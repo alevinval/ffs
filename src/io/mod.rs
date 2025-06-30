@@ -1,7 +1,7 @@
 pub use reader::Reader;
 pub use writer::Writer;
 
-use crate::Error;
+use crate::{Error, filesystem::Addr};
 
 mod reader;
 mod writer;
@@ -18,8 +18,8 @@ pub trait Write {
         self.write(&value.to_le_bytes())
     }
 
-    fn write_u32(&mut self, value: u32) -> Result<usize, Error> {
-        self.write(&value.to_le_bytes())
+    fn write_addr(&mut self, addr: Addr) -> Result<usize, Error> {
+        self.write(&addr.to_le_bytes())
     }
 }
 
@@ -39,9 +39,9 @@ pub trait Read {
         Ok(u16::from_le_bytes(buf))
     }
 
-    fn read_u32(&mut self) -> Result<u32, Error> {
-        let mut buf = [0u8; 4];
+    fn read_addr(&mut self) -> Result<Addr, Error> {
+        let mut buf = [0u8; size_of::<Addr>()];
         self.read(&mut buf)?;
-        Ok(u32::from_le_bytes(buf))
+        Ok(Addr::from_le_bytes(buf))
     }
 }

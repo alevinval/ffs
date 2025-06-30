@@ -1,14 +1,14 @@
 use crate::{
     filesystem::{
-        Addr, Block, BlockDevice, Deserializable, EraseFromDevice, Error, Layout, SerdeLen,
-        Serializable, StaticReadFromDevice, WriteToDevice,
+        Addr, Block, BlockDevice, Deserializable, EraseFrom, Error, Layout, LoadFromStatic,
+        SerdeLen, Serializable, Store,
     },
     io::{Read, Write},
 };
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct Meta {
-    table_sector: Addr,
+    tree_sector: Addr,
     file_sector: Addr,
     node_sector: Addr,
     free_sector: Addr,
@@ -27,8 +27,8 @@ impl Meta {
     const SIGNATURE: [u8; 2] = [0x13, 0x37];
 
     pub const fn new() -> Self {
-        Meta {
-            table_sector: Layout::TREE.begin,
+        Self {
+            tree_sector: Layout::TREE.begin,
             file_sector: Layout::FILE.begin,
             node_sector: Layout::NODE.begin,
             free_sector: Layout::FREE.begin,
@@ -45,11 +45,11 @@ impl SerdeLen for Meta {
 
 impl Serializable for Meta {
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<usize, Error> {
-        let mut n = writer.write_u32(self.table_sector)?;
-        n += writer.write_u32(self.file_sector)?;
-        n += writer.write_u32(self.node_sector)?;
-        n += writer.write_u32(self.free_sector)?;
-        n += writer.write_u32(self.data_sector)?;
+        let mut n = writer.write_addr(self.tree_sector)?;
+        n += writer.write_addr(self.file_sector)?;
+        n += writer.write_addr(self.node_sector)?;
+        n += writer.write_addr(self.free_sector)?;
+        n += writer.write_addr(self.data_sector)?;
         n += writer.write_u16(self.block_size)?;
         n += writer.write(&[0; 488])?;
         n += writer.write(&Self::SIGNATURE)?;
@@ -57,20 +57,20 @@ impl Serializable for Meta {
     }
 }
 
-impl Deserializable<Meta> for Meta {
-    fn deserialize<R: Read>(reader: &mut R) -> Result<Meta, Error> {
-        let table_sector = reader.read_u32()?;
-        let file_sector = reader.read_u32()?;
-        let node_sector = reader.read_u32()?;
-        let free_sector = reader.read_u32()?;
-        let data_sector = reader.read_u32()?;
+impl Deserializable<Self> for Meta {
+    fn deserialize<R: Read>(reader: &mut R) -> Result<Self, Error> {
+        let table_sector = reader.read_addr()?;
+        let file_sector = reader.read_addr()?;
+        let node_sector = reader.read_addr()?;
+        let free_sector = reader.read_addr()?;
+        let data_sector = reader.read_addr()?;
         let block_size = reader.read_u16()?;
         reader.read(&mut [0; 488])?;
         let mut signature = [0u8; 2];
         reader.read(&mut signature)?;
 
-        Ok(Meta {
-            table_sector,
+        Ok(Self {
+            tree_sector: table_sector,
             file_sector,
             node_sector,
             free_sector,
@@ -81,11 +81,11 @@ impl Deserializable<Meta> for Meta {
     }
 }
 
-impl<D> WriteToDevice<D> for Meta
+impl<D> Store<D> for Meta
 where
     D: BlockDevice,
 {
-    fn write_to_device(&self, out: &mut D) -> Result<(), Error> {
+    fn store(&self, out: &mut D) -> Result<(), Error> {
         let mut block = Block::new();
         self.serialize(&mut block.writer())?;
 
@@ -94,24 +94,24 @@ where
     }
 }
 
-impl<D> StaticReadFromDevice<D> for Meta
+impl<D> LoadFromStatic<D> for Meta
 where
     D: BlockDevice,
 {
     type Item = Self;
 
-    fn read_from_device(device: &mut D) -> Result<Self, Error> {
+    fn load_from(device: &mut D) -> Result<Self, Error> {
         let mut block = Block::new();
         device.read_block(0, &mut block)?;
-        Meta::deserialize(&mut block.reader())
+        Self::deserialize(&mut block.reader())
     }
 }
 
-impl<D> EraseFromDevice<D> for Meta
+impl<D> EraseFrom<D> for Meta
 where
     D: BlockDevice,
 {
-    fn erase_from_device(&self, device: &mut D) -> Result<(), Error> {
+    fn erase_from(&self, device: &mut D) -> Result<(), Error> {
         device.write_block(Layout::META.begin, &Block::new())
     }
 }
@@ -137,15 +137,15 @@ mod test {
     fn write_to_device_then_read() {
         let mut device = MockDevice::new();
         let expected = Meta::new();
-        assert_eq!(Ok(()), expected.write_to_device(&mut device));
-        assert_eq!(Ok(expected), Meta::read_from_device(&mut device));
+        assert_eq!(Ok(()), expected.store(&mut device));
+        assert_eq!(Ok(expected), Meta::load_from(&mut device));
     }
 
     #[test]
     fn erase_from_device() {
         let mut device = MockDevice::new();
         let sut = Meta::new();
-        assert_eq!(Ok(()), sut.erase_from_device(&mut device));
+        assert_eq!(Ok(()), sut.erase_from(&mut device));
 
         device.assert_write(0, 0, &[0u8; Block::LEN]);
     }

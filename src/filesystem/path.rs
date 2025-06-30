@@ -1,11 +1,13 @@
-use crate::{Error, filesystem::MAX_FILENAME_LEN};
+use crate::{Error, filesystem::Name};
+
+pub const SEPARATOR: char = '/';
 
 pub fn validate(path: &str) -> Result<(), Error> {
     let first = first_component(path);
-    if first == path && path.len() < MAX_FILENAME_LEN {
+    if first == path && path.len() < Name::MAX_LEN {
         return Ok(());
     }
-    if first.len() >= MAX_FILENAME_LEN {
+    if first.len() >= Name::MAX_LEN {
         return Err(Error::FileNameTooLong);
     }
     validate(tail(path))
@@ -13,12 +15,12 @@ pub fn validate(path: &str) -> Result<(), Error> {
 
 pub fn dirname(path: &str) -> &str {
     let path = norm(path);
-    path.rsplit_once('/').map(|(dirname, _)| dirname).unwrap_or_default()
+    path.rsplit_once(SEPARATOR).map(|(dirname, _)| dirname).unwrap_or_default()
 }
 
 pub fn basename(path: &str) -> &str {
     let path = norm(path);
-    path.rsplit_once('/').map(|(_, basename)| basename).unwrap_or(path)
+    path.rsplit_once(SEPARATOR).map(|(_, basename)| basename).unwrap_or(path)
 }
 
 pub fn tail(path: &str) -> &str {
@@ -33,11 +35,11 @@ pub fn tail(path: &str) -> &str {
 
 pub fn first_component(path: &str) -> &str {
     let path = norm(path);
-    path.split('/').next().unwrap_or("")
+    path.split(SEPARATOR).next().unwrap_or("")
 }
 
-pub fn norm(file_name: &str) -> &str {
-    file_name.trim_start_matches('/').trim_end_matches('/')
+pub fn norm(path: &str) -> &str {
+    path.trim_start_matches(SEPARATOR).trim_end_matches(SEPARATOR)
 }
 
 #[cfg(test)]

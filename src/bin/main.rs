@@ -18,6 +18,14 @@ where
     println!()
 }
 
+fn ls_stats(ctrl: &mut Controller<impl BlockDevice>) {
+    let file_count = ctrl.count_files().expect("failed to count files");
+    let free_blocks = ctrl.free_data_blocks().expect("failed to count free blocks");
+    println!("stats:");
+    println!("files: {file_count}");
+    println!("free blocks: {free_blocks}");
+}
+
 fn main() {
     // Too annoying to work on macOS with this:
     // - it requires root privileges to access raw disk devices.
@@ -41,28 +49,36 @@ Montes nascetur ridiculus mus donec rhoncus eros lobortis. Maximus eget fermentu
 Vestibulum fusce dictum risus blandit quis suspendisse aliquet. Ante condimentum neque at luctus nibh finibus facilisis.
 Ligula congue sollicitudin erat viverra ac tincidunt nam. Euismod quam justo lectus commodo augue arcu dignissim.";
 
-    let sdcard = match MemoryDisk::load_from_file(512, "sdcard.img") {
-        Ok(disk) => {
-            println!("Loaded sdcard.img");
-            disk
-        }
-        Err(_) => {
+    let sdcard = MemoryDisk::load_from_file(512, "sdcard.img").map_or_else(
+        |_| {
             println!("Formatting sdcard...");
             let mut disk = MemoryDisk::new(512, 8 * 1024 * 1024);
             Controller::format(&mut disk).expect("failed to format SD card");
             disk
-        }
-    };
+        },
+        |disk| {
+            println!("Loaded sdcard.img");
+            disk
+        },
+    );
 
     let mut ctrl = Controller::mount(sdcard).expect("failed to read metadata");
 
     println!("Controller initialized");
+
+    ls_stats(&mut ctrl);
     ls_tree(&mut ctrl);
 
     println!("Creating file...");
     let fname = "hello/world/lorem_ipsum8.txt";
-    ctrl.create(fname, data).expect("failed to create file");
+    let _ = ctrl.create(fname, data);
+    let _ = ctrl.create("/var/log/asd.txt", data);
+    let _ = ctrl.create("/var/log/two.txt", data);
+    let _ = ctrl.create("/var/log/three.txt", data);
+    let _ = ctrl.create("/var/log/four.txt", data);
+    let _ = ctrl.create("/mnt/boot/dev", data);
 
+    ls_stats(&mut ctrl);
     ls_tree(&mut ctrl);
     rm_file(&mut ctrl, fname);
     ls_tree(&mut ctrl);

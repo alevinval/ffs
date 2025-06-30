@@ -1,53 +1,53 @@
 use crate::{
-    Addr, BlockDevice, Error,
+    BlockDevice, Error,
     filesystem::{
-        Deserializable, Layout, SerdeLen, Serializable, block::Block, directory::FileEntry,
-        file_name::FileName,
+        Addr, Deserializable, Layout, SerdeLen, Serializable, block::Block,
+        directory::file_ref::FileRef, name::Name,
     },
     io::{Read, Reader, Write, Writer},
 };
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct DirEntry {
-    pub name: FileName,
-    pub dirs: [Addr; Self::MAX_CHILD_DIRS],
-    pub files: [FileEntry; Self::MAX_CHILD_FILES],
+    pub name: Name,
+    pub dir_addrs: [Addr; Self::MAX_CHILD_DIRS],
+    pub file_refs: [FileRef; Self::MAX_CHILD_FILES],
 }
 
 impl DirEntry {
+    const LAYOUT: Layout = Layout::TREE;
+
     pub const MAX_CHILD_FILES: usize = 27;
     pub const MAX_CHILD_DIRS: usize = 16;
 
-    pub fn root() -> Self {
-        Self::new("".into())
+    pub const fn root() -> Self {
+        Self::new(Name::empty())
     }
 
-    pub const fn new(name: FileName) -> Self {
+    pub const fn new(name: Name) -> Self {
         let dirs = [const { 0 }; Self::MAX_CHILD_DIRS];
-        let files = [const { FileEntry::empty() }; Self::MAX_CHILD_FILES];
-        Self { name, dirs, files }
+        let file_refs = [const { FileRef::empty() }; Self::MAX_CHILD_FILES];
+        Self { name, dir_addrs: dirs, file_refs }
     }
 
-    pub fn load<D: BlockDevice>(device: &mut D, idx: Addr) -> Result<DirEntry, Error> {
-        let range = Layout::TREE;
-        let mut buffer = [0u8; DirEntry::SERDE_BUFFER_LEN];
-        let start_sector = range.nth(idx);
+    pub fn load<D: BlockDevice>(device: &mut D, idx: Addr) -> Result<Self, Error> {
+        let mut buffer = [0u8; Self::SERDE_BUFFER_LEN];
+        let start_sector = Self::LAYOUT.nth(idx);
 
         for (i, chunk) in buffer.chunks_mut(Block::LEN).enumerate() {
             device.read_block(start_sector + i as Addr, chunk)?;
         }
 
         let mut reader = Reader::new(&buffer);
-        DirEntry::deserialize(&mut reader)
+        Self::deserialize(&mut reader)
     }
 
     pub fn store<D>(&self, device: &mut D, idx: Addr) -> Result<(), Error>
     where
         D: BlockDevice,
     {
-        let range = Layout::TREE;
-        let start_sector = range.nth(idx);
-        let mut buffer = [0u8; DirEntry::SERDE_BUFFER_LEN];
+        let start_sector = Self::LAYOUT.nth(idx);
+        let mut buffer = [0u8; Self::SERDE_BUFFER_LEN];
         let mut writer = Writer::new(&mut buffer);
         self.serialize(&mut writer)?;
 
@@ -59,39 +59,39 @@ impl DirEntry {
 }
 
 impl SerdeLen for DirEntry {
-    const SERDE_LEN: usize = FileName::SERDE_LEN
+    const SERDE_LEN: usize = Name::SERDE_LEN
         + Self::MAX_CHILD_DIRS * size_of::<Addr>()
-        + Self::MAX_CHILD_FILES * FileEntry::SERDE_LEN;
+        + Self::MAX_CHILD_FILES * FileRef::SERDE_LEN;
 }
 
 impl Serializable for DirEntry {
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<usize, Error> {
         let mut n = self.name.serialize(writer)?;
-        for child in self.dirs {
-            n += writer.write_u32(child)?;
+        for addr in self.dir_addrs {
+            n += writer.write_addr(addr)?;
         }
-        for file in &self.files {
-            n += file.serialize(writer)?;
+        for file_ref in &self.file_refs {
+            n += file_ref.serialize(writer)?;
         }
         Ok(n)
     }
 }
 
-impl Deserializable<DirEntry> for DirEntry {
+impl Deserializable<Self> for DirEntry {
     fn deserialize<R: Read>(reader: &mut R) -> Result<Self, Error> {
-        let name = FileName::deserialize(reader)?;
+        let name = Name::deserialize(reader)?;
 
-        let mut dirs = [0; Self::MAX_CHILD_DIRS];
-        for dir in dirs.iter_mut() {
-            *dir = reader.read_u32()?;
+        let mut dir_addrs = [0; Self::MAX_CHILD_DIRS];
+        for dir in dir_addrs.iter_mut() {
+            *dir = reader.read_addr()?;
         }
 
-        let mut files = [const { FileEntry::empty() }; Self::MAX_CHILD_FILES];
-        for file in files.iter_mut() {
-            *file = FileEntry::deserialize(reader)?;
+        let mut file_refs = [const { FileRef::empty() }; Self::MAX_CHILD_FILES];
+        for file_ref in file_refs.iter_mut() {
+            *file_ref = FileRef::deserialize(reader)?;
         }
 
-        Ok(Self { name, dirs, files })
+        Ok(Self { name, dir_addrs, file_refs })
     }
 }
 #[cfg(test)]

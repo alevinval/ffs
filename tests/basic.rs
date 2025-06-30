@@ -1,6 +1,6 @@
-use ffs::{BlockDevice, Controller, DirEntry, Error, disk::MemoryDisk};
+use ffs::{BlockDevice, Constants, Controller, Error, disk::MemoryDisk};
 
-const FILE_NAME: &str = "/some/path/some-file-name";
+const FILE_PATH: &str = "/some/path/some-file-name";
 const DATA_FIXTURE: &[u8] = b"some data for file";
 
 #[test]
@@ -24,27 +24,27 @@ fn mount_device_formatted() {
 fn create_file() {
     let device = mounting(device(), |ctrl| {
         assert_eq!(Ok(0), ctrl.count_files());
-        assert_eq!(Ok(()), ctrl.create(FILE_NAME, DATA_FIXTURE));
+        assert_eq!(Ok(()), ctrl.create(FILE_PATH, DATA_FIXTURE));
         assert_eq!(Ok(1), ctrl.count_files());
     });
 
-    assert_eq!(21, device.reads_count);
+    assert_eq!(15, device.reads_count);
     assert_eq!(23, device.writes_count)
 }
 
 #[test]
 fn create_then_delete_file() {
     let device = mounting(device(), |ctrl| {
-        assert_eq!(Ok(()), ctrl.create(FILE_NAME, DATA_FIXTURE));
+        assert_eq!(Ok(()), ctrl.create(FILE_PATH, DATA_FIXTURE));
         assert_eq!(Ok(1), ctrl.count_files());
     });
 
     let device = mounting(device, |ctrl| {
-        assert_eq!(Ok(()), ctrl.delete(FILE_NAME));
+        assert_eq!(Ok(()), ctrl.delete(FILE_PATH));
         assert_eq!(Ok(0), ctrl.count_files());
     });
 
-    assert_eq!(51, device.reads_count);
+    assert_eq!(45, device.reads_count);
     assert_eq!(38, device.writes_count)
 }
 
@@ -63,7 +63,7 @@ fn create_file_with_long_name_fails() {
 fn create_file_with_data_too_big() {
     let big_data = [255u8; 5121];
     let device = mounting(device(), |ctrl| {
-        assert_eq!(Error::FileTooLarge, ctrl.create(FILE_NAME, &big_data).unwrap_err());
+        assert_eq!(Error::FileTooLarge, ctrl.create(FILE_PATH, &big_data).unwrap_err());
     });
 
     assert_eq!(1, device.reads_count);
@@ -79,47 +79,47 @@ fn create_max_files() {
         let mut subdir = 0;
 
         for i in 0..=n_files {
-            let full_dir = i % DirEntry::MAX_CHILD_FILES == 0;
+            let full_dir = i % Constants::MAX_CHILD_FILES == 0;
 
             if full_dir && i > 0 {
                 subdir += 1;
-                if subdir == DirEntry::MAX_CHILD_DIRS {
+                if subdir == Constants::MAX_CHILD_DIRS {
                     subdir = 0;
                     dir += 1;
                 }
             }
 
-            let file_name = format!("/{dir}/{subdir}/file-{i}");
-            println!("creating {file_name}");
-            assert_eq!(Ok(()), ctrl.create(&file_name, DATA_FIXTURE));
+            let file_path = format!("/{dir}/{subdir}/file-{i}");
+            println!("creating {file_path}");
+            assert_eq!(Ok(()), ctrl.create(&file_path, DATA_FIXTURE));
         }
     });
 
-    assert_eq!(36615, device.reads_count);
+    assert_eq!(35578, device.reads_count);
     assert_eq!(7425, device.writes_count);
 }
 
 #[test]
 fn create_file_twice_fails() {
     let device = mounting(device(), |ctrl| {
-        assert_eq!(Ok(()), ctrl.create(FILE_NAME, DATA_FIXTURE));
+        assert_eq!(Ok(()), ctrl.create(FILE_PATH, DATA_FIXTURE));
     });
 
     let device = mounting(device, |ctrl| {
         assert_eq!(
             Error::FileAlreadyExists,
-            ctrl.create(FILE_NAME, DATA_FIXTURE).expect_err("should have failed creating twice")
+            ctrl.create(FILE_PATH, DATA_FIXTURE).expect_err("should have failed creating twice")
         );
     });
 
-    assert_eq!(22, device.reads_count);
+    assert_eq!(21, device.reads_count);
     assert_eq!(23, device.writes_count);
 }
 
 #[test]
 fn delete_file_that_does_not_exist() {
     let device = mounting(device(), |ctrl| {
-        assert_eq!(Error::FileNotFound, ctrl.delete(FILE_NAME).unwrap_err());
+        assert_eq!(Error::FileNotFound, ctrl.delete(FILE_PATH).unwrap_err());
     });
 
     assert_eq!(4, device.reads_count);

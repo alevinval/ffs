@@ -6,15 +6,8 @@ pub struct Writer<'a> {
 }
 
 impl<'a> Writer<'a> {
-    pub fn new(inner: &'a mut [u8]) -> Self {
+    pub const fn new(inner: &'a mut [u8]) -> Self {
         Writer { inner, pos: 0 }
-    }
-    pub fn seek(&mut self, pos: usize) -> Result<(), Error> {
-        if pos > self.inner.len() {
-            return Err(Error::BufferTooSmall { expected: pos, found: self.inner.len() });
-        }
-        self.pos = pos;
-        Ok(())
     }
 }
 

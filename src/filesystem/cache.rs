@@ -1,4 +1,7 @@
-use crate::{Addr, BlockDevice, Error, filesystem::block::Block};
+use crate::{
+    BlockDevice, Error,
+    filesystem::{Addr, block::Block},
+};
 
 #[derive(Debug)]
 struct CacheEntry {

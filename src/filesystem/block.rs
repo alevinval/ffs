@@ -4,7 +4,7 @@ use crate::io::{Reader, Writer};
 
 /// Keeps a buffer of [`Block::LEN`] bytes.
 #[derive(Eq, PartialEq)]
-pub(crate) struct Block {
+pub struct Block {
     inner: [u8; Self::LEN],
 }
 
@@ -17,7 +17,7 @@ impl Block {
         Self { inner: [0u8; Self::LEN] }
     }
 
-    pub fn from_slice(slice: &[u8]) -> Self {
+    pub const fn from_slice(slice: &[u8]) -> Self {
         let mut block = Self::new();
         block.inner.copy_from_slice(slice);
         block
@@ -27,11 +27,11 @@ impl Block {
         &mut self.inner
     }
 
-    pub fn writer(&mut self) -> Writer<'_> {
+    pub const fn writer(&mut self) -> Writer<'_> {
         Writer::new(&mut self.inner)
     }
 
-    pub fn reader(&self) -> Reader<'_> {
+    pub const fn reader(&self) -> Reader<'_> {
         Reader::new(&self.inner)
     }
 }

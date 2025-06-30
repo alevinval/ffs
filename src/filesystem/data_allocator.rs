@@ -1,17 +1,17 @@
 use crate::{
     BlockDevice, Error,
-    filesystem::{Addr, Block, Deserializable, Free, Node, Serializable, range::Range},
+    filesystem::{Addr, Block, Deserializable, Free, Node, Serializable, layout::Layout},
 };
 
 #[derive(Debug)]
-pub(crate) struct DataAllocator {
-    range: Range,
+pub struct DataAllocator {
+    layout: Layout,
     last_accessed: Addr,
 }
 
 impl DataAllocator {
-    pub const fn new(range: Range) -> Self {
-        Self { last_accessed: 0, range }
+    pub const fn new(layout: Layout) -> Self {
+        Self { last_accessed: 0, layout }
     }
 
     /// Attempts to allocate enough blocks to fit `file_size` bytes and returns a [`Node`] instance
@@ -38,12 +38,11 @@ impl DataAllocator {
         Ok(())
     }
 
-    #[cfg(test)]
-    fn count_free_addresses<D: BlockDevice>(&self, device: &mut D) -> Result<Addr, Error> {
+    pub fn count_free_addresses<D: BlockDevice>(&self, device: &mut D) -> Result<usize, Error> {
         let mut block = Block::new();
-        let mut total = 0 as Addr;
+        let mut total = 0;
 
-        for sector in self.range.iter_sectors() {
+        for sector in self.layout.iter_sectors() {
             device.read_block(sector, &mut block)?;
             let free = Free::deserialize(&mut block.reader())?;
             total += free.count_free_addresses();
@@ -113,7 +112,7 @@ impl DataAllocator {
     fn allocate<D: BlockDevice>(&mut self, device: &mut D) -> Result<Addr, Error> {
         let mut block = Block::new();
 
-        for (addr, sector) in self.range.circular_iter(self.last_accessed) {
+        for (addr, sector) in self.layout.circular_iter(self.last_accessed) {
             device.read_block(sector, &mut block)?;
             let mut free = Free::deserialize(&mut block.reader())?;
 
@@ -137,7 +136,7 @@ impl DataAllocator {
     /// - May adjust `self.last_accessed` to improve future allocation locality.
     fn release<D: BlockDevice>(&mut self, device: &mut D, data_sector: Addr) -> Result<(), Error> {
         let logical_addr = to_free_logical(data_sector) as Addr;
-        let free_sector = self.range.nth(logical_addr);
+        let free_sector = self.layout.nth(logical_addr);
         let offset = to_allocated_offset(data_sector);
 
         let mut block = Block::new();
@@ -172,11 +171,11 @@ mod test {
 
     use super::*;
 
-    const RANGE: Range = Range::new(0, 2);
+    const TEST_LAYOUT: Layout = Layout::new(0, 2);
 
     fn get_sut() -> (MemoryDisk, DataAllocator) {
-        let device = MemoryDisk::fit(RANGE.sector_count());
-        let sut = DataAllocator::new(RANGE);
+        let device = MemoryDisk::fit(TEST_LAYOUT.sector_count());
+        let sut = DataAllocator::new(TEST_LAYOUT);
         (device, sut)
     }
 

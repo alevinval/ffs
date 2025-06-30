@@ -1,13 +1,28 @@
-use crate::filesystem::Addr;
+use crate::{
+    DirEntry,
+    filesystem::{Addr, SerdeLen, free::Free, node::Node},
+};
+
+const N_TREE: usize = 50;
+const N_FILE: usize = N_TREE * DirEntry::MAX_CHILD_FILES;
+const N_DATA: usize = Node::BLOCKS_PER_NODE * N_FILE;
+const N_FREE: usize = N_DATA / Free::SLOTS;
 
 #[derive(Debug)]
-pub(crate) struct Range {
+pub struct Layout {
     pub begin: Addr,
     pub end: Addr,
     pub blocks_per_entry: Addr,
 }
 
-impl Range {
+impl Layout {
+    pub const META: Self = Self::new(0, 1);
+    pub const TREE: Self = next(Self::META, N_TREE, DirEntry::SERDE_BLOCK_COUNT);
+    pub const FILE: Self = next(Self::TREE, N_FILE, 1);
+    pub const NODE: Self = next(Self::FILE, N_FILE, 1);
+    pub const FREE: Self = next(Self::NODE, N_FREE, 1);
+    pub const DATA: Self = next(Self::FREE, N_DATA, 1);
+
     pub const fn new(begin: Addr, capacity: Addr) -> Self {
         Self::new_with_size(begin, capacity, 1)
     }
@@ -36,10 +51,6 @@ impl Range {
         self.begin + (logical * self.blocks_per_entry)
     }
 
-    pub const fn next_range(&self, capacity: usize, entry_size: usize) -> Self {
-        Self::new_with_size(self.end, capacity as Addr, entry_size as Addr)
-    }
-
     pub fn iter(&self) -> impl Iterator<Item = (Addr, Addr)> {
         (0..self.entries_count()).map(|addr| (addr, self.nth(addr)))
     }
@@ -50,10 +61,13 @@ impl Range {
             .map(|addr| (addr, self.nth(addr)))
     }
 
-    #[cfg(test)]
     pub const fn iter_sectors(&self) -> core::ops::Range<Addr> {
         self.begin..self.end
     }
+}
+
+const fn next(prev: Layout, capacity: usize, entry_size: usize) -> Layout {
+    Layout::new_with_size(prev.end, capacity as Addr, entry_size as Addr)
 }
 
 #[cfg(test)]
@@ -61,19 +75,32 @@ mod test {
 
     use super::*;
 
+    fn assert_continuous_layout_range(a: Layout, b: Layout) {
+        assert!(a.end == b.begin, "range {a:?} does not end where {b:?} begins");
+    }
+
     #[test]
-    fn range_creation() {
-        let range = Range::new(0, 10);
-        assert_eq!(range.begin, 0);
-        assert_eq!(range.end, 10);
-        assert_eq!(range.sector_count(), 10);
-        assert_eq!(range.entries_count(), 10);
+    fn layout_ranges_are_continuous() {
+        assert_continuous_layout_range(Layout::META, Layout::TREE);
+        assert_continuous_layout_range(Layout::TREE, Layout::FILE);
+        assert_continuous_layout_range(Layout::FILE, Layout::NODE);
+        assert_continuous_layout_range(Layout::NODE, Layout::FREE);
+        assert_continuous_layout_range(Layout::FREE, Layout::DATA);
+    }
+
+    #[test]
+    fn new_with_size() {
+        let sut = Layout::new_with_size(2, 12, 4);
+        assert_eq!(sut.begin, 2);
+        assert_eq!(sut.end, 50);
+        assert_eq!(sut.sector_count(), 48);
+        assert_eq!(sut.entries_count(), 12);
     }
 
     #[test]
     fn iter() {
-        let range = Range::new(5, 10);
-        let mut iter = range.iter();
+        let sut = Layout::new(5, 10);
+        let mut iter = sut.iter();
         assert_eq!(Some((0, 5)), iter.next());
         assert_eq!(Some((1, 6)), iter.next());
         assert_eq!(Some((2, 7)), iter.next());
@@ -82,8 +109,8 @@ mod test {
 
     #[test]
     fn circular_iter() {
-        let range = Range::new(5, 10);
-        let mut iter = range.circular_iter(8);
+        let sut = Layout::new(5, 10);
+        let mut iter = sut.circular_iter(8);
         assert_eq!(Some((8, 13)), iter.next());
         assert_eq!(Some((9, 14)), iter.next());
         assert_eq!(Some((0, 5)), iter.next());
@@ -92,50 +119,40 @@ mod test {
 
     #[test]
     fn iter_sectors() {
-        let range = Range::new(5, 10);
-        let iter = range.iter_sectors();
+        let sut = Layout::new(5, 10);
+        let iter = sut.iter_sectors();
         assert_eq!(5, iter.start);
         assert_eq!(15, iter.end)
     }
 
     #[test]
-    fn range_nth() {
-        let range = Range::new(0, 10);
-        assert_eq!(range.nth(5), 5);
+    fn nth() {
+        let sut = Layout::new(0, 10);
+        assert_eq!(sut.nth(5), 5);
     }
 
     #[test]
     #[should_panic(expected = "Address out of range")]
-    fn range_nth_out_of_bounds() {
-        let range = Range::new(0, 10);
-        range.nth(10);
+    fn nth_out_of_bounds() {
+        Layout::new(0, 10).nth(10);
     }
 
-    mod range_with_size {
+    mod with_size {
         use super::*;
 
         #[test]
-        fn range_with_size_creation() {
-            let range = Range::new_with_size(1, 10, 2);
-            assert_eq!(range.begin, 1);
-            assert_eq!(range.end, 21);
-            assert_eq!(range.sector_count(), 20);
-            assert_eq!(range.entries_count(), 10);
-        }
-
-        #[test]
-        fn range_with_size_nth() {
-            let range = Range::new_with_size(1, 10, 2);
-            assert_eq!(range.nth(0), 1);
-            assert_eq!(range.nth(1), 3);
-            assert_eq!(range.nth(2), 5);
-            assert_eq!(range.nth(3), 7);
+        fn nth() {
+            let sut = Layout::new_with_size(1, 10, 2);
+            assert_eq!(sut.nth(0), 1);
+            assert_eq!(sut.nth(1), 3);
+            assert_eq!(sut.nth(2), 5);
+            assert_eq!(sut.nth(3), 7);
         }
 
         #[test]
         fn iter() {
-            let range = Range::new_with_size(1, 13, 4);
-            let mut iter = range.iter();
+            let sut = Layout::new_with_size(1, 13, 4);
+            let mut iter = sut.iter();
             assert_eq!(Some((0, 1)), iter.next());
             assert_eq!(Some((1, 5)), iter.next());
             assert_eq!(Some((2, 9)), iter.next());
@@ -144,8 +161,8 @@ mod test {
 
         #[test]
         fn circular_iter() {
-            let range = Range::new_with_size(1, 13, 4);
-            let mut iter = range.circular_iter(2);
+            let sut = Layout::new_with_size(1, 13, 4);
+            let mut iter = sut.circular_iter(2);
             assert_eq!(Some((2, 9)), iter.next());
             assert_eq!(Some((3, 13)), iter.next());
             assert_eq!(Some((4, 17)), iter.next());
