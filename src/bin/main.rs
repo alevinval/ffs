@@ -71,7 +71,8 @@ Ligula congue sollicitudin erat viverra ac tincidunt nam. Euismod quam justo lec
 
     println!("Creating file...");
     let fname = "hello/world/lorem_ipsum8.txt";
-    let _ = ctrl.create(fname, data);
+    ctrl.create(fname, data).expect("failed to create file");
+
     let _ = ctrl.create("/var/log/asd.txt", data);
     let _ = ctrl.create("/var/log/two.txt", data);
     let _ = ctrl.create("/var/log/three.txt", data);

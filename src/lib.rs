@@ -20,8 +20,7 @@ pub struct Constants {}
 
 impl Constants {
     pub const MAX_FILE_NAME_LEN: usize = Name::MAX_LEN;
-    pub const MAX_CHILD_DIRS: usize = DirEntry::MAX_CHILD_DIRS;
-    pub const MAX_CHILD_FILES: usize = DirEntry::MAX_CHILD_FILES;
+    pub const MAX_EDGES: usize = DirEntry::MAX_EDGES;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

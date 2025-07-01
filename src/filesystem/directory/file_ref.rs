@@ -26,12 +26,12 @@ impl FileRef {
         &self.name
     }
 
-    pub const fn is_valid(&self) -> bool {
-        !self.name.is_empty()
-    }
-
     pub const fn addr(&self) -> Addr {
         self.addr
+    }
+
+    pub const fn is_set(&self) -> bool {
+        self.addr != 0
     }
 
     pub const fn clear(&mut self) {

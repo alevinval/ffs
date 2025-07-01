@@ -2,32 +2,35 @@ use crate::{
     BlockDevice, Error,
     filesystem::{
         Addr, Deserializable, Layout, SerdeLen, Serializable, block::Block,
-        directory::file_ref::FileRef, name::Name,
+        directory::file_ref::FileRef,
     },
     io::{Read, Reader, Write, Writer},
 };
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct DirEntry {
-    pub name: Name,
-    pub dir_addrs: [Addr; Self::MAX_CHILD_DIRS],
-    pub file_refs: [FileRef; Self::MAX_CHILD_FILES],
+    pub is_leaf: bool,
+    pub is_empty: bool,
+    pub edges: [FileRef; Self::MAX_EDGES],
 }
 
 impl DirEntry {
     const LAYOUT: Layout = Layout::TREE;
 
-    pub const MAX_CHILD_FILES: usize = 27;
-    pub const MAX_CHILD_DIRS: usize = 16;
+    pub const MAX_EDGES: usize = 29;
 
     pub const fn root() -> Self {
-        Self::new(Name::empty())
+        Self::new_node()
     }
 
-    pub const fn new(name: Name) -> Self {
-        let dirs = [const { 0 }; Self::MAX_CHILD_DIRS];
-        let file_refs = [const { FileRef::empty() }; Self::MAX_CHILD_FILES];
-        Self { name, dir_addrs: dirs, file_refs }
+    pub const fn new_node() -> Self {
+        let edges = [const { FileRef::empty() }; Self::MAX_EDGES];
+        Self { is_empty: false, is_leaf: false, edges }
+    }
+
+    pub const fn new_leaf() -> Self {
+        let edges = [const { FileRef::empty() }; Self::MAX_EDGES];
+        Self { is_empty: false, is_leaf: true, edges }
     }
 
     pub fn load<D: BlockDevice>(device: &mut D, idx: Addr) -> Result<Self, Error> {
@@ -59,19 +62,21 @@ impl DirEntry {
 }
 
 impl SerdeLen for DirEntry {
-    const SERDE_LEN: usize = Name::SERDE_LEN
-        + Self::MAX_CHILD_DIRS * size_of::<Addr>()
-        + Self::MAX_CHILD_FILES * FileRef::SERDE_LEN;
+    const SERDE_LEN: usize = 1 + Self::MAX_EDGES * FileRef::SERDE_LEN;
 }
 
 impl Serializable for DirEntry {
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<usize, Error> {
-        let mut n = self.name.serialize(writer)?;
-        for addr in self.dir_addrs {
-            n += writer.write_addr(addr)?;
+        let mut bitmap = 0u8;
+        if !self.is_empty {
+            bitmap |= 0b1;
         }
-        for file_ref in &self.file_refs {
-            n += file_ref.serialize(writer)?;
+        if self.is_leaf {
+            bitmap |= 0b1 << 1;
+        }
+        let mut n = writer.write_u8(bitmap)?;
+        for edge in &self.edges {
+            n += edge.serialize(writer)?;
         }
         Ok(n)
     }
@@ -79,19 +84,16 @@ impl Serializable for DirEntry {
 
 impl Deserializable<Self> for DirEntry {
     fn deserialize<R: Read>(reader: &mut R) -> Result<Self, Error> {
-        let name = Name::deserialize(reader)?;
+        let bitmap = reader.read_u8()?;
+        let is_empty = bitmap & 0b1 == 0;
+        let is_leaf = bitmap & (0b10) == 2;
 
-        let mut dir_addrs = [0; Self::MAX_CHILD_DIRS];
-        for dir in dir_addrs.iter_mut() {
-            *dir = reader.read_addr()?;
+        let mut edges = [const { FileRef::empty() }; Self::MAX_EDGES];
+        for edge in edges.iter_mut() {
+            *edge = FileRef::deserialize(reader)?;
         }
 
-        let mut file_refs = [const { FileRef::empty() }; Self::MAX_CHILD_FILES];
-        for file_ref in file_refs.iter_mut() {
-            *file_ref = FileRef::deserialize(reader)?;
-        }
-
-        Ok(Self { name, dir_addrs, file_refs })
+        Ok(Self { is_empty, is_leaf, edges })
     }
 }
 #[cfg(test)]
@@ -103,6 +105,8 @@ mod test {
 
     #[test]
     fn serde_symmetry() {
+        assert_eq!(3, DirEntry::SERDE_BLOCK_COUNT);
+
         let expected = DirEntry::root();
         let mut buffer = [0u8; Block::LEN * DirEntry::SERDE_BLOCK_COUNT];
         let mut writer = Writer::new(&mut buffer);

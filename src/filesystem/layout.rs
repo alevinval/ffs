@@ -3,8 +3,8 @@ use crate::{
     filesystem::{Addr, SerdeLen, free::Free, node::Node},
 };
 
-const N_TREE: usize = 50;
-const N_FILE: usize = N_TREE * DirEntry::MAX_CHILD_FILES;
+const N_TREE: usize = 100;
+const N_FILE: usize = N_TREE * DirEntry::MAX_EDGES;
 const N_DATA: usize = Node::BLOCKS_PER_NODE * N_FILE;
 const N_FREE: usize = N_DATA / Free::SLOTS;
 

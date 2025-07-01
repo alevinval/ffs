@@ -79,11 +79,11 @@ fn create_max_files() {
         let mut subdir = 0;
 
         for i in 0..=n_files {
-            let full_dir = i % Constants::MAX_CHILD_FILES == 0;
+            let full_dir = i % Constants::MAX_EDGES == 0;
 
             if full_dir && i > 0 {
                 subdir += 1;
-                if subdir == Constants::MAX_CHILD_DIRS {
+                if subdir == Constants::MAX_EDGES {
                     subdir = 0;
                     dir += 1;
                 }
@@ -95,8 +95,8 @@ fn create_max_files() {
         }
     });
 
-    assert_eq!(35578, device.reads_count);
-    assert_eq!(7425, device.writes_count);
+    assert_eq!(12173, device.reads_count);
+    assert_eq!(7407, device.writes_count);
 }
 
 #[test]
