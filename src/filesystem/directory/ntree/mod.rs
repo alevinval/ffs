@@ -4,10 +4,11 @@ pub use dir_entry::DirEntry;
 use std::println;
 
 mod dir_entry;
+mod search;
 
 use crate::{
     BlockDevice, Error,
-    filesystem::{Addr, Layout, Name, directory::FileRef, path},
+    filesystem::{Addr, Layout, directory::FileRef, path},
 };
 
 #[derive(Debug, PartialEq, Eq)]
@@ -54,18 +55,19 @@ impl DirTree {
 fn remove_file<D: BlockDevice>(device: &mut D, file_path: &str, addr: Addr) -> Result<(), Error> {
     let mut current = DirEntry::load(device, addr)?;
     if path::dirname(file_path).is_empty() {
-        if let Some(edge) = current.edges.iter_mut().find(|r| r.name() == path::basename(file_path))
-        {
-            edge.clear();
+        let basename = path::basename(file_path);
+        if let Some(edge) = current.find_mut(basename) {
+            *edge = FileRef::empty();
             current.store(device, addr)?;
             return Ok(());
         }
         return Err(Error::FileNotFound);
     }
 
+    let next_path = path::tail(file_path);
     let first_component = path::first_component(file_path);
-    if let Some(edge) = current.edges.iter().find(|r| r.name() == first_component) {
-        return remove_file(device, path::tail(file_path), edge.addr());
+    if let Some(edge) = current.find(first_component) {
+        return remove_file(device, next_path, edge.addr());
     }
     Err(Error::FileNotFound)
 }
@@ -73,15 +75,16 @@ fn remove_file<D: BlockDevice>(device: &mut D, file_path: &str, addr: Addr) -> R
 fn get_file<D: BlockDevice>(device: &mut D, file_path: &str, addr: Addr) -> Result<FileRef, Error> {
     let current = DirEntry::load(device, addr)?;
     if path::dirname(file_path).is_empty() {
-        if let Some(edge) = current.edges.iter().find(|r| r.name() == path::basename(file_path)) {
+        if let Some(edge) = current.find(path::basename(file_path)) {
             return Ok(edge.clone());
         }
         return Err(Error::FileNotFound);
     }
 
+    let next_path = path::tail(file_path);
     let first_component = path::first_component(file_path);
-    if let Some(dir_ref) = current.edges.iter().find(|r| r.name() == first_component) {
-        return get_file(device, path::tail(file_path), dir_ref.addr());
+    if let Some(dir_ref) = current.find(first_component) {
+        return get_file(device, next_path, dir_ref.addr());
     }
     Err(Error::FileNotFound)
 }
@@ -92,59 +95,43 @@ fn insert_file<D: BlockDevice>(
     addr: Addr,
 ) -> Result<FileRef, Error> {
     let mut current = DirEntry::load(device, addr)?;
-
-    // No directory left, do file insertion on the current entry.
     if path::dirname(file_path).is_empty() {
-        if current.edges.iter().any(|r| r.name() == file_path) {
+        if current.find(file_path).is_some() {
             return Err(Error::FileAlreadyExists);
         }
 
-        let file_ref = {
-            let (pos, file_ref) = current
-                .edges
-                .iter_mut()
-                .enumerate()
-                .find(|(_, r)| !r.is_set())
-                .ok_or(Error::StorageFull)?;
-            *file_ref = FileRef::new(
-                Name::new(file_path)?,
-                addr * DirEntry::MAX_EDGES as Addr + pos as Addr,
-            );
-            file_ref.clone()
-        };
+        let edge = current.insert_file(file_path, addr);
         current.store(device, addr)?;
-        return Ok(file_ref);
+        return edge;
     }
 
-    // Otherwise, check the children directories to see if we need to follow it.
     let next_path = path::tail(file_path);
     let first_component = path::first_component(file_path);
-    if let Some(edge) = current.edges.iter().find(|r| r.name() == first_component) {
+    if let Some(edge) = current.find(first_component) {
         return insert_file(device, next_path, edge.addr());
     }
 
     // If we reach here, it means we need to create a new directory entry for the first component.
     // First check if the current node can fit another child directory.
-    let file_ref = current.edges.iter_mut().find(|r| !r.is_set()).ok_or(Error::StorageFull)?;
+    current.find_unset().ok_or(Error::StorageFull)?;
     let next_addr = find_free_addr_for_direntry(device)?;
+    current.insert_node(first_component, next_addr)?;
 
-    if path::dirname(path::tail(file_path)).is_empty() {
-        DirEntry::new_leaf().store(device, next_addr)?;
+    let entry = if path::dirname(path::tail(file_path)).is_empty() {
+        DirEntry::new_leaf()
     } else {
-        DirEntry::new_node().store(device, next_addr)?;
-    }
-
-    // Persist current entry, and continue insertion in the new directory.
-    let name = Name::new(first_component).unwrap();
-    *file_ref = FileRef::new(name, next_addr);
+        DirEntry::new()
+    };
+    entry.store(device, next_addr)?;
     current.store(device, addr)?;
+
     insert_file(device, next_path, next_addr)
 }
 
 fn find_free_addr_for_direntry<D: BlockDevice>(device: &mut D) -> Result<Addr, Error> {
     for (addr, _) in Layout::TREE.iter().skip(1) {
         let entry = DirEntry::load(device, addr)?;
-        if entry.is_empty {
+        if entry.is_empty() {
             return Ok(addr);
         }
     }
@@ -168,12 +155,12 @@ fn print_tree_inner<D: BlockDevice>(
         println!("$/")
     }
 
-    if current_node.is_leaf {
-        for edge in current_node.edges.iter().filter(|r| r.is_set()) {
+    if current_node.is_leaf() {
+        for edge in current_node.iter_set() {
             println!("{}{}", "  ".repeat(depth + 2), edge.name().as_str());
         }
     } else {
-        for edge in current_node.edges.iter().filter(|r| r.is_set()) {
+        for edge in current_node.iter_set() {
             println!("{}{}/", "  ".repeat(depth + 1), edge.name().as_str());
             print_tree_inner(device, edge.addr(), depth + 1, max_depth)?
         }
@@ -187,11 +174,11 @@ where
     D: BlockDevice,
 {
     let current_node = DirEntry::load(device, addr)?;
-    if current_node.is_leaf {
-        Ok(current_node.edges.iter().filter(|r| r.is_set()).count())
+    if current_node.is_leaf() {
+        Ok(current_node.iter_set().count())
     } else {
         let mut count = 0;
-        for dir_ref in current_node.edges.iter().filter(|r| r.is_set()) {
+        for dir_ref in current_node.iter_set() {
             count += count_files(device, dir_ref.addr())?;
         }
         Ok(count)

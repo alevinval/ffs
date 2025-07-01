@@ -44,7 +44,7 @@ where
 
     pub fn format(device: &mut D) -> Result<(), Error> {
         Meta::new().store(device)?;
-        DirEntry::root().store(device, 0)
+        DirEntry::new().store(device, 0)
     }
 
     pub fn create(&mut self, file_path: &str, data: &[u8]) -> Result<(), Error>

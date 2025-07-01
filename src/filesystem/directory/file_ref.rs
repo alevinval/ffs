@@ -34,11 +34,6 @@ impl FileRef {
         self.addr != 0
     }
 
-    pub const fn clear(&mut self) {
-        self.name = Name::empty();
-        self.addr = 0;
-    }
-
     pub const fn get_handles(&self) -> (FileHandle, NodeHandle) {
         (FileHandle::new(self.addr), NodeHandle::new(self.addr))
     }

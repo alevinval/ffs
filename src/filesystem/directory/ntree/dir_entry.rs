@@ -1,7 +1,7 @@
 use crate::{
     BlockDevice, Error,
     filesystem::{
-        Addr, Deserializable, Layout, SerdeLen, Serializable, block::Block,
+        Addr, Deserializable, Layout, Name, SerdeLen, Serializable, block::Block,
         directory::file_ref::FileRef,
     },
     io::{Read, Reader, Write, Writer},
@@ -9,9 +9,9 @@ use crate::{
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct DirEntry {
-    pub is_leaf: bool,
-    pub is_empty: bool,
-    pub edges: [FileRef; Self::MAX_EDGES],
+    is_leaf: bool,
+    is_empty: bool,
+    edges: [FileRef; Self::MAX_EDGES],
 }
 
 impl DirEntry {
@@ -19,18 +19,63 @@ impl DirEntry {
 
     pub const MAX_EDGES: usize = 29;
 
-    pub const fn root() -> Self {
-        Self::new_node()
-    }
-
-    pub const fn new_node() -> Self {
+    pub const fn new() -> Self {
         let edges = [const { FileRef::empty() }; Self::MAX_EDGES];
         Self { is_empty: false, is_leaf: false, edges }
     }
 
-    pub const fn new_leaf() -> Self {
+    pub(super) const fn new_leaf() -> Self {
         let edges = [const { FileRef::empty() }; Self::MAX_EDGES];
         Self { is_empty: false, is_leaf: true, edges }
+    }
+
+    pub const fn is_empty(&self) -> bool {
+        self.is_empty
+    }
+
+    pub const fn is_leaf(&self) -> bool {
+        self.is_leaf
+    }
+
+    pub fn insert_node(&mut self, name: &str, addr: Addr) -> Result<FileRef, Error> {
+        let (_, edge) = self.find_unset().ok_or(Error::StorageFull)?;
+        let name = Name::new(name)?;
+        *edge = FileRef::new(name, addr);
+        Ok(edge.clone())
+    }
+
+    pub fn insert_file(&mut self, name: &str, addr: Addr) -> Result<FileRef, Error> {
+        if !self.is_leaf {
+            return Err(Error::Unsupported);
+        }
+
+        let (pos, edge) = self.find_unset().ok_or(Error::StorageFull)?;
+        let name = Name::new(name)?;
+        *edge = FileRef::new(name, addr * Self::MAX_EDGES as Addr + pos as Addr);
+        Ok(edge.clone())
+    }
+
+    pub fn find(&self, name: &str) -> Option<&FileRef> {
+        self.edges.iter().find(|r| r.name().as_str() == name)
+    }
+
+    pub fn find_mut(&mut self, name: &str) -> Option<&mut FileRef> {
+        self.edges.iter_mut().find(|r| r.name().as_str() == name)
+    }
+
+    pub fn find_unset(&mut self) -> Option<(usize, &mut FileRef)> {
+        self.edges.iter_mut().enumerate().find(|(_, r)| !r.is_set())
+    }
+
+    pub fn iter_set(&self) -> impl Iterator<Item = &FileRef> {
+        self.filter(|r| r.is_set())
+    }
+
+    fn filter<P>(&self, predicate: P) -> impl Iterator<Item = &FileRef>
+    where
+        P: FnMut(&&FileRef) -> bool,
+    {
+        self.edges.iter().filter(predicate)
     }
 
     pub fn load<D: BlockDevice>(device: &mut D, idx: Addr) -> Result<Self, Error> {
@@ -107,7 +152,7 @@ mod test {
     fn serde_symmetry() {
         assert_eq!(3, DirEntry::SERDE_BLOCK_COUNT);
 
-        let expected = DirEntry::root();
+        let expected = DirEntry::new();
         let mut buffer = [0u8; Block::LEN * DirEntry::SERDE_BLOCK_COUNT];
         let mut writer = Writer::new(&mut buffer);
         let n = expected.serialize(&mut writer).unwrap();
