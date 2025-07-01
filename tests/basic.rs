@@ -79,11 +79,11 @@ fn create_max_files() {
         let mut subdir = 0;
 
         for i in 0..=n_files {
-            let full_dir = i % Constants::MAX_EDGES == 0;
+            let full_dir = i % Constants::DIR_NODE_ENTRIES == 0;
 
             if full_dir && i > 0 {
                 subdir += 1;
-                if subdir == Constants::MAX_EDGES {
+                if subdir == Constants::DIR_NODE_ENTRIES {
                     subdir = 0;
                     dir += 1;
                 }

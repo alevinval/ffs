@@ -13,13 +13,13 @@ use crate::{
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Name {
-    buffer: [u8; Self::MAX_LEN],
+    buffer: [u8; Self::LEN],
     len: usize,
 }
 
 impl Name {
     /// Maximum length of a file name in bytes.
-    pub const MAX_LEN: usize = 47;
+    pub const LEN: usize = 47;
 
     pub const fn empty() -> Self {
         Self { buffer: Self::buffer(), len: 0 }
@@ -36,7 +36,7 @@ impl Name {
             "file names should never contain a separator character"
         );
 
-        if name.len() > Self::MAX_LEN {
+        if name.len() > Self::LEN {
             return Err(Error::FileNameTooLong);
         }
 
@@ -67,13 +67,13 @@ impl Name {
     }
 
     /// Creates a new empty buffer to store a file name.
-    const fn buffer() -> [u8; Self::MAX_LEN] {
-        [0u8; Self::MAX_LEN]
+    const fn buffer() -> [u8; Self::LEN] {
+        [0u8; Self::LEN]
     }
 }
 
 impl SerdeLen for Name {
-    const SERDE_LEN: usize = Self::MAX_LEN + 1;
+    const SERDE_LEN: usize = Self::LEN + 1;
 }
 
 impl Serializable for Name {
@@ -87,7 +87,7 @@ impl Serializable for Name {
 impl Deserializable<Self> for Name {
     fn deserialize<R: Read>(reader: &mut R) -> Result<Self, Error> {
         let len = reader.read_u8()? as usize;
-        if len > Self::MAX_LEN {
+        if len > Self::LEN {
             return Err(Error::FileNameTooLong);
         }
 
@@ -154,7 +154,7 @@ mod tests {
 
     #[test]
     fn name_fits() {
-        let name = "a".repeat(Name::MAX_LEN);
+        let name = "a".repeat(Name::LEN);
 
         let actual = Name::new(&name).unwrap();
         assert_eq!(name.as_bytes(), actual.as_bytes());
@@ -162,7 +162,7 @@ mod tests {
 
     #[test]
     fn name_too_long() {
-        let name = "b".repeat(Name::MAX_LEN + 1);
+        let name = "b".repeat(Name::LEN + 1);
         let result = Name::new(&name);
         assert_eq!(Error::FileNameTooLong, result.unwrap_err());
     }

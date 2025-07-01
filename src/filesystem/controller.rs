@@ -5,7 +5,7 @@ use crate::{
         cache::BlockCache,
         data_allocator::DataAllocator,
         data_writer::DataWriter,
-        directory::{DirEntry, DirTree},
+        directory::{DirNode, DirTree},
         file::File,
         meta::Meta,
         node::Node,
@@ -44,7 +44,7 @@ where
 
     pub fn format(device: &mut D) -> Result<(), Error> {
         Meta::new().store(device)?;
-        DirEntry::new().store(device, 0)
+        DirNode::new().store(device, 0)
     }
 
     pub fn create(&mut self, file_path: &str, data: &[u8]) -> Result<(), Error>

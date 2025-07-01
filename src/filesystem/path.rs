@@ -4,10 +4,10 @@ pub const SEPARATOR: char = '/';
 
 pub fn validate(path: &str) -> Result<(), Error> {
     let first = first_component(path);
-    if first == path && path.len() < Name::MAX_LEN {
+    if first == path && path.len() < Name::LEN {
         return Ok(());
     }
-    if first.len() >= Name::MAX_LEN {
+    if first.len() >= Name::LEN {
         return Err(Error::FileNameTooLong);
     }
     validate(tail(path))

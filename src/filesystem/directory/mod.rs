@@ -1,6 +1,6 @@
-pub use file_ref::FileRef;
-pub use ntree::DirEntry;
+pub use entry::Entry;
 pub use ntree::DirTree;
+pub use ntree::TreeNode as DirNode;
 
-mod file_ref;
+mod entry;
 mod ntree;

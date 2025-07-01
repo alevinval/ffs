@@ -1,10 +1,10 @@
 use crate::{
-    DirEntry,
+    DirNode,
     filesystem::{Addr, SerdeLen, free::Free, node::Node},
 };
 
 const N_TREE: usize = 100;
-const N_FILE: usize = N_TREE * DirEntry::MAX_EDGES;
+const N_FILE: usize = N_TREE * DirNode::LEN;
 const N_DATA: usize = Node::BLOCKS_PER_NODE * N_FILE;
 const N_FREE: usize = N_DATA / Free::SLOTS;
 
@@ -17,7 +17,7 @@ pub struct Layout {
 
 impl Layout {
     pub const META: Self = Self::new(0, 1);
-    pub const TREE: Self = next(Self::META, N_TREE, DirEntry::SERDE_BLOCK_COUNT);
+    pub const TREE: Self = next(Self::META, N_TREE, DirNode::SERDE_BLOCK_COUNT);
     pub const FILE: Self = next(Self::TREE, N_FILE, 1);
     pub const NODE: Self = next(Self::FILE, N_FILE, 1);
     pub const FREE: Self = next(Self::NODE, N_FREE, 1);

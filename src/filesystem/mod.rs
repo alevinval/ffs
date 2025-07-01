@@ -1,5 +1,5 @@
 pub use controller::Controller;
-pub use directory::DirEntry;
+pub use directory::DirNode;
 pub use name::Name;
 
 use crate::{

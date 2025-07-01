@@ -8,7 +8,7 @@ pub(crate) mod test_utils;
 
 pub use filesystem::{BlockDevice, Controller};
 
-use filesystem::{DirEntry, Name};
+use filesystem::{DirNode, Name};
 
 #[cfg(feature = "test-support")]
 pub mod disk;
@@ -19,8 +19,8 @@ mod io;
 pub struct Constants {}
 
 impl Constants {
-    pub const MAX_FILE_NAME_LEN: usize = Name::MAX_LEN;
-    pub const MAX_EDGES: usize = DirEntry::MAX_EDGES;
+    pub const FILENAME_LEN: usize = Name::LEN;
+    pub const DIR_NODE_ENTRIES: usize = DirNode::LEN;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

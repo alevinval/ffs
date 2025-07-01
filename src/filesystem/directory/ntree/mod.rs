@@ -1,21 +1,20 @@
-pub use dir_entry::DirEntry;
+pub use tree_node::TreeNode;
 
 #[cfg(feature = "std")]
 use std::println;
 
-mod dir_entry;
-mod search;
+mod tree_node;
 
 use crate::{
     BlockDevice, Error,
-    filesystem::{Addr, Layout, directory::FileRef, path},
+    filesystem::{Addr, Layout, directory::Entry, path},
 };
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct DirTree {}
 
 impl DirTree {
-    pub fn insert_file<D>(&self, device: &mut D, file_path: &str) -> Result<FileRef, Error>
+    pub fn insert_file<D>(&self, device: &mut D, file_path: &str) -> Result<Entry, Error>
     where
         D: BlockDevice,
     {
@@ -29,7 +28,7 @@ impl DirTree {
         remove_file(device, file_path, 0)
     }
 
-    pub fn get_file<D>(&self, device: &mut D, file_path: &str) -> Result<FileRef, Error>
+    pub fn get_file<D>(&self, device: &mut D, file_path: &str) -> Result<Entry, Error>
     where
         D: BlockDevice,
     {
@@ -53,11 +52,11 @@ impl DirTree {
 }
 
 fn remove_file<D: BlockDevice>(device: &mut D, file_path: &str, addr: Addr) -> Result<(), Error> {
-    let mut current = DirEntry::load(device, addr)?;
+    let mut current = TreeNode::load(device, addr)?;
     if path::dirname(file_path).is_empty() {
         let basename = path::basename(file_path);
-        if let Some(edge) = current.find_mut(basename) {
-            *edge = FileRef::empty();
+        if let Some(entry) = current.find_mut(basename) {
+            *entry = Entry::empty();
             current.store(device, addr)?;
             return Ok(());
         }
@@ -66,17 +65,17 @@ fn remove_file<D: BlockDevice>(device: &mut D, file_path: &str, addr: Addr) -> R
 
     let next_path = path::tail(file_path);
     let first_component = path::first_component(file_path);
-    if let Some(edge) = current.find(first_component) {
-        return remove_file(device, next_path, edge.addr());
+    if let Some(entry) = current.find(first_component) {
+        return remove_file(device, next_path, entry.addr());
     }
     Err(Error::FileNotFound)
 }
 
-fn get_file<D: BlockDevice>(device: &mut D, file_path: &str, addr: Addr) -> Result<FileRef, Error> {
-    let current = DirEntry::load(device, addr)?;
+fn get_file<D: BlockDevice>(device: &mut D, file_path: &str, addr: Addr) -> Result<Entry, Error> {
+    let current = TreeNode::load(device, addr)?;
     if path::dirname(file_path).is_empty() {
-        if let Some(edge) = current.find(path::basename(file_path)) {
-            return Ok(edge.clone());
+        if let Some(entry) = current.find(path::basename(file_path)) {
+            return Ok(entry.clone());
         }
         return Err(Error::FileNotFound);
     }
@@ -93,22 +92,22 @@ fn insert_file<D: BlockDevice>(
     device: &mut D,
     file_path: &str,
     addr: Addr,
-) -> Result<FileRef, Error> {
-    let mut current = DirEntry::load(device, addr)?;
+) -> Result<Entry, Error> {
+    let mut current = TreeNode::load(device, addr)?;
     if path::dirname(file_path).is_empty() {
         if current.find(file_path).is_some() {
             return Err(Error::FileAlreadyExists);
         }
 
-        let edge = current.insert_file(file_path, addr);
+        let entry = current.insert_file(file_path, addr);
         current.store(device, addr)?;
-        return edge;
+        return entry;
     }
 
     let next_path = path::tail(file_path);
     let first_component = path::first_component(file_path);
-    if let Some(edge) = current.find(first_component) {
-        return insert_file(device, next_path, edge.addr());
+    if let Some(entry) = current.find(first_component) {
+        return insert_file(device, next_path, entry.addr());
     }
 
     // If we reach here, it means we need to create a new directory entry for the first component.
@@ -118,9 +117,9 @@ fn insert_file<D: BlockDevice>(
     current.insert_node(first_component, next_addr)?;
 
     let entry = if path::dirname(path::tail(file_path)).is_empty() {
-        DirEntry::new_leaf()
+        TreeNode::new_leaf()
     } else {
-        DirEntry::new()
+        TreeNode::new()
     };
     entry.store(device, next_addr)?;
     current.store(device, addr)?;
@@ -130,7 +129,7 @@ fn insert_file<D: BlockDevice>(
 
 fn find_free_addr_for_direntry<D: BlockDevice>(device: &mut D) -> Result<Addr, Error> {
     for (addr, _) in Layout::TREE.iter().skip(1) {
-        let entry = DirEntry::load(device, addr)?;
+        let entry = TreeNode::load(device, addr)?;
         if entry.is_empty() {
             return Ok(addr);
         }
@@ -149,20 +148,20 @@ fn print_tree_inner<D: BlockDevice>(
         return Ok(());
     }
 
-    let current_node = DirEntry::load(device, addr)?;
+    let current_node = TreeNode::load(device, addr)?;
 
     if addr == 0 {
         println!("$/")
     }
 
     if current_node.is_leaf() {
-        for edge in current_node.iter_set() {
-            println!("{}{}", "  ".repeat(depth + 2), edge.name().as_str());
+        for entry in current_node.iter_set() {
+            println!("{}{}", "  ".repeat(depth + 2), entry.name().as_str());
         }
     } else {
-        for edge in current_node.iter_set() {
-            println!("{}{}/", "  ".repeat(depth + 1), edge.name().as_str());
-            print_tree_inner(device, edge.addr(), depth + 1, max_depth)?
+        for entry in current_node.iter_set() {
+            println!("{}{}/", "  ".repeat(depth + 1), entry.name().as_str());
+            print_tree_inner(device, entry.addr(), depth + 1, max_depth)?
         }
     }
 
@@ -173,7 +172,7 @@ fn count_files<D>(device: &mut D, addr: Addr) -> Result<usize, Error>
 where
     D: BlockDevice,
 {
-    let current_node = DirEntry::load(device, addr)?;
+    let current_node = TreeNode::load(device, addr)?;
     if current_node.is_leaf() {
         Ok(current_node.iter_set().count())
     } else {

@@ -2,31 +2,31 @@ use crate::{
     BlockDevice, Error,
     filesystem::{
         Addr, Deserializable, Layout, Name, SerdeLen, Serializable, block::Block,
-        directory::file_ref::FileRef,
+        directory::entry::Entry,
     },
     io::{Read, Reader, Write, Writer},
 };
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct DirEntry {
+pub struct TreeNode {
     is_leaf: bool,
     is_empty: bool,
-    edges: [FileRef; Self::MAX_EDGES],
+    entries: [Entry; Self::LEN],
 }
 
-impl DirEntry {
+impl TreeNode {
     const LAYOUT: Layout = Layout::TREE;
 
-    pub const MAX_EDGES: usize = 29;
+    pub const LEN: usize = 29;
 
     pub const fn new() -> Self {
-        let edges = [const { FileRef::empty() }; Self::MAX_EDGES];
-        Self { is_empty: false, is_leaf: false, edges }
+        let entries = [const { Entry::empty() }; Self::LEN];
+        Self { is_empty: false, is_leaf: false, entries }
     }
 
     pub(super) const fn new_leaf() -> Self {
-        let edges = [const { FileRef::empty() }; Self::MAX_EDGES];
-        Self { is_empty: false, is_leaf: true, edges }
+        let entries = [const { Entry::empty() }; Self::LEN];
+        Self { is_empty: false, is_leaf: true, entries }
     }
 
     pub const fn is_empty(&self) -> bool {
@@ -37,45 +37,45 @@ impl DirEntry {
         self.is_leaf
     }
 
-    pub fn insert_node(&mut self, name: &str, addr: Addr) -> Result<FileRef, Error> {
-        let (_, edge) = self.find_unset().ok_or(Error::StorageFull)?;
+    pub fn insert_node(&mut self, name: &str, addr: Addr) -> Result<Entry, Error> {
+        let (_, entry) = self.find_unset().ok_or(Error::StorageFull)?;
         let name = Name::new(name)?;
-        *edge = FileRef::new(name, addr);
-        Ok(edge.clone())
+        *entry = Entry::new(name, addr);
+        Ok(entry.clone())
     }
 
-    pub fn insert_file(&mut self, name: &str, addr: Addr) -> Result<FileRef, Error> {
+    pub fn insert_file(&mut self, name: &str, addr: Addr) -> Result<Entry, Error> {
         if !self.is_leaf {
             return Err(Error::Unsupported);
         }
 
-        let (pos, edge) = self.find_unset().ok_or(Error::StorageFull)?;
+        let (pos, entry) = self.find_unset().ok_or(Error::StorageFull)?;
         let name = Name::new(name)?;
-        *edge = FileRef::new(name, addr * Self::MAX_EDGES as Addr + pos as Addr);
-        Ok(edge.clone())
+        *entry = Entry::new(name, addr * Self::LEN as Addr + pos as Addr);
+        Ok(entry.clone())
     }
 
-    pub fn find(&self, name: &str) -> Option<&FileRef> {
-        self.edges.iter().find(|r| r.name().as_str() == name)
+    pub fn find(&self, name: &str) -> Option<&Entry> {
+        self.entries.iter().find(|r| r.name().as_str() == name)
     }
 
-    pub fn find_mut(&mut self, name: &str) -> Option<&mut FileRef> {
-        self.edges.iter_mut().find(|r| r.name().as_str() == name)
+    pub fn find_mut(&mut self, name: &str) -> Option<&mut Entry> {
+        self.entries.iter_mut().find(|r| r.name().as_str() == name)
     }
 
-    pub fn find_unset(&mut self) -> Option<(usize, &mut FileRef)> {
-        self.edges.iter_mut().enumerate().find(|(_, r)| !r.is_set())
+    pub fn find_unset(&mut self) -> Option<(usize, &mut Entry)> {
+        self.entries.iter_mut().enumerate().find(|(_, r)| !r.is_set())
     }
 
-    pub fn iter_set(&self) -> impl Iterator<Item = &FileRef> {
+    pub fn iter_set(&self) -> impl Iterator<Item = &Entry> {
         self.filter(|r| r.is_set())
     }
 
-    fn filter<P>(&self, predicate: P) -> impl Iterator<Item = &FileRef>
+    fn filter<P>(&self, predicate: P) -> impl Iterator<Item = &Entry>
     where
-        P: FnMut(&&FileRef) -> bool,
+        P: FnMut(&&Entry) -> bool,
     {
-        self.edges.iter().filter(predicate)
+        self.entries.iter().filter(predicate)
     }
 
     pub fn load<D: BlockDevice>(device: &mut D, idx: Addr) -> Result<Self, Error> {
@@ -106,11 +106,11 @@ impl DirEntry {
     }
 }
 
-impl SerdeLen for DirEntry {
-    const SERDE_LEN: usize = 1 + Self::MAX_EDGES * FileRef::SERDE_LEN;
+impl SerdeLen for TreeNode {
+    const SERDE_LEN: usize = 1 + Self::LEN * Entry::SERDE_LEN;
 }
 
-impl Serializable for DirEntry {
+impl Serializable for TreeNode {
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<usize, Error> {
         let mut bitmap = 0u8;
         if !self.is_empty {
@@ -120,25 +120,25 @@ impl Serializable for DirEntry {
             bitmap |= 0b1 << 1;
         }
         let mut n = writer.write_u8(bitmap)?;
-        for edge in &self.edges {
-            n += edge.serialize(writer)?;
+        for entry in &self.entries {
+            n += entry.serialize(writer)?;
         }
         Ok(n)
     }
 }
 
-impl Deserializable<Self> for DirEntry {
+impl Deserializable<Self> for TreeNode {
     fn deserialize<R: Read>(reader: &mut R) -> Result<Self, Error> {
         let bitmap = reader.read_u8()?;
         let is_empty = bitmap & 0b1 == 0;
         let is_leaf = bitmap & (0b10) == 2;
 
-        let mut edges = [const { FileRef::empty() }; Self::MAX_EDGES];
-        for edge in edges.iter_mut() {
-            *edge = FileRef::deserialize(reader)?;
+        let mut entries = [const { Entry::empty() }; Self::LEN];
+        for entry in entries.iter_mut() {
+            *entry = Entry::deserialize(reader)?;
         }
 
-        Ok(Self { is_empty, is_leaf, edges })
+        Ok(Self { is_empty, is_leaf, entries })
     }
 }
 #[cfg(test)]
@@ -150,16 +150,16 @@ mod test {
 
     #[test]
     fn serde_symmetry() {
-        assert_eq!(3, DirEntry::SERDE_BLOCK_COUNT);
+        assert_eq!(3, TreeNode::SERDE_BLOCK_COUNT);
 
-        let expected = DirEntry::new();
-        let mut buffer = [0u8; Block::LEN * DirEntry::SERDE_BLOCK_COUNT];
+        let expected = TreeNode::new();
+        let mut buffer = [0u8; Block::LEN * TreeNode::SERDE_BLOCK_COUNT];
         let mut writer = Writer::new(&mut buffer);
         let n = expected.serialize(&mut writer).unwrap();
-        assert_eq!(DirEntry::SERDE_LEN, n);
+        assert_eq!(TreeNode::SERDE_LEN, n);
 
         let mut reader = Reader::new(&buffer);
-        let actual = DirEntry::deserialize(&mut reader).unwrap();
+        let actual = TreeNode::deserialize(&mut reader).unwrap();
 
         assert_eq!(expected, actual);
     }

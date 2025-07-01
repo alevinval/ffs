@@ -8,12 +8,12 @@ use crate::{
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FileRef {
+pub struct Entry {
     name: Name,
     addr: Addr,
 }
 
-impl FileRef {
+impl Entry {
     pub const fn empty() -> Self {
         Self { name: Name::empty(), addr: 0 }
     }
@@ -39,17 +39,17 @@ impl FileRef {
     }
 }
 
-impl Default for FileRef {
+impl Default for Entry {
     fn default() -> Self {
         Self::empty()
     }
 }
 
-impl SerdeLen for FileRef {
+impl SerdeLen for Entry {
     const SERDE_LEN: usize = Name::SERDE_LEN + size_of::<Addr>();
 }
 
-impl Serializable for FileRef {
+impl Serializable for Entry {
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<usize, Error> {
         let mut n = self.name.serialize(writer)?;
         n += writer.write_addr(self.addr)?;
@@ -57,7 +57,7 @@ impl Serializable for FileRef {
     }
 }
 
-impl Deserializable<Self> for FileRef {
+impl Deserializable<Self> for Entry {
     fn deserialize<R: Read>(reader: &mut R) -> Result<Self, Error> {
         let name = Name::deserialize(reader)?;
         let addr = reader.read_addr()?;
@@ -76,9 +76,9 @@ mod test {
     fn serde_symmetry() {
         let mut block = Block::new();
 
-        let expected = FileRef::new("test_file".into(), 1);
-        assert_eq!(Ok(FileRef::SERDE_LEN), expected.serialize(&mut block.writer()));
-        let actual = FileRef::deserialize(&mut block.reader()).unwrap();
+        let expected = Entry::new("test_file".into(), 1);
+        assert_eq!(Ok(Entry::SERDE_LEN), expected.serialize(&mut block.writer()));
+        let actual = Entry::deserialize(&mut block.reader()).unwrap();
 
         assert_eq!(expected, actual);
     }
