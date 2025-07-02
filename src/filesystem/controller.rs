@@ -5,7 +5,7 @@ use crate::{
         cache::BlockCache,
         data_allocator::DataAllocator,
         data_writer::DataWriter,
-        directory::{DirNode, DirTree},
+        directory::{Directory, DirectoryNode},
         file::File,
         meta::Meta,
         node::Node,
@@ -20,7 +20,7 @@ where
     D: BlockDevice,
 {
     device: BlockCache<D>,
-    directory: DirTree,
+    directory: Directory,
     data_allocator: DataAllocator,
 }
 
@@ -32,9 +32,9 @@ where
         if Meta::load_from(&mut device)? != Meta::new() {
             return Err(Error::Unsupported);
         }
-        let directory = DirTree {};
-        let data_allocator = DataAllocator::new(Layout::FREE);
         let device = BlockCache::mount(device);
+        let directory = Directory {};
+        let data_allocator = DataAllocator::new(Layout::FREE);
         Ok(Self { device, directory, data_allocator })
     }
 
@@ -44,7 +44,7 @@ where
 
     pub fn format(device: &mut D) -> Result<(), Error> {
         Meta::new().store(device)?;
-        DirNode::new().store(device, 0)
+        DirectoryNode::new().store(device, 0)
     }
 
     pub fn create(&mut self, file_path: &str, data: &[u8]) -> Result<(), Error>
@@ -58,8 +58,8 @@ where
             return Err(Error::FileTooLarge);
         }
 
-        let file_ref = self.directory.insert_file(&mut self.device, file_path)?;
-        let file = File::new(*file_ref.name(), file_ref.addr());
+        let entry = self.directory.insert_file(&mut self.device, file_path)?;
+        let file = File::new(*entry.name(), entry.addr());
         let node = self.data_allocator.allocate_node_data(&mut self.device, file_size)?;
         DataWriter::new(node.block_addrs(), data).store(&mut self.device)?;
         NodeWriter::new(file.node_addr(), &node).store(&mut self.device)?;
@@ -70,8 +70,8 @@ where
     pub fn delete(&mut self, file_path: &str) -> Result<(), Error> {
         path::validate(file_path)?;
 
-        let file_ref = self.directory.get_file(&mut self.device, file_path)?;
-        let (file_handle, node_handle) = file_ref.get_handles();
+        let entry = self.directory.get_file(&mut self.device, file_path)?;
+        let (file_handle, node_handle) = entry.get_handles();
         let node = node_handle.load_from(&mut self.device)?;
 
         node_handle.erase_from(&mut self.device)?;

@@ -8,7 +8,8 @@ pub(crate) mod test_utils;
 
 pub use filesystem::{BlockDevice, Controller};
 
-use filesystem::{DirNode, Name};
+use crate::filesystem::DirectoryNode;
+use crate::filesystem::Name;
 
 #[cfg(feature = "test-support")]
 pub mod disk;
@@ -20,7 +21,7 @@ pub struct Constants {}
 
 impl Constants {
     pub const FILENAME_LEN: usize = Name::LEN;
-    pub const DIR_NODE_ENTRIES: usize = DirNode::LEN;
+    pub const DIR_NODE_ENTRIES: usize = DirectoryNode::LEN;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
