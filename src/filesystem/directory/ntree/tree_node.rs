@@ -1,8 +1,12 @@
 use crate::{
     BlockDevice, Error,
     filesystem::{
-        Addr, Deserializable, Layout, Name, SerdeLen, Serializable, block::Block,
-        directory::entry::Entry,
+        Addr, Deserializable, Layout, Name, SerdeLen, Serializable,
+        block::Block,
+        directory::{
+            entry::Entry,
+            search::{binary_search, binary_search_mut},
+        },
     },
     io::{Read, Reader, Write, Writer},
 };
@@ -40,35 +44,38 @@ impl TreeNode {
     pub fn insert_node(&mut self, name: &str, addr: Addr) -> Result<Entry, Error> {
         let (_, entry) = self.find_unset().ok_or(Error::StorageFull)?;
         let name = Name::new(name)?;
-        *entry = Entry::new(name, addr);
-        Ok(entry.clone())
+        let value = Entry::new(name, addr);
+        *entry = value.clone();
+        self.entries.sort_by(|a, b| a.name().as_str().cmp(b.name().as_str()));
+        Ok(value)
     }
 
     pub fn insert_file(&mut self, name: &str, addr: Addr) -> Result<Entry, Error> {
         if !self.is_leaf {
             return Err(Error::Unsupported);
         }
-
         let (pos, entry) = self.find_unset().ok_or(Error::StorageFull)?;
         let name = Name::new(name)?;
-        *entry = Entry::new(name, addr * Self::LEN as Addr + pos as Addr);
-        Ok(entry.clone())
+        let value = Entry::new(name, addr * Self::LEN as Addr + pos as Addr);
+        *entry = value.clone();
+        self.entries.sort_by(|a, b| a.name().as_str().cmp(b.name().as_str()));
+        Ok(value)
     }
 
     pub fn find(&self, name: &str) -> Option<&Entry> {
-        self.entries.iter().find(|r| r.name().as_str() == name)
+        binary_search(&self.entries, name, |entry| entry.name().as_str())
     }
 
     pub fn find_mut(&mut self, name: &str) -> Option<&mut Entry> {
-        self.entries.iter_mut().find(|r| r.name().as_str() == name)
+        binary_search_mut(&mut self.entries, name, |entry| entry.name().as_str())
     }
 
     pub fn find_unset(&mut self) -> Option<(usize, &mut Entry)> {
-        self.entries.iter_mut().enumerate().find(|(_, r)| !r.is_set())
+        self.entries.iter_mut().enumerate().find(|(_, entry)| !entry.is_set())
     }
 
     pub fn iter_set(&self) -> impl Iterator<Item = &Entry> {
-        self.filter(|r| r.is_set())
+        self.filter(|entry| entry.is_set())
     }
 
     fn filter<P>(&self, predicate: P) -> impl Iterator<Item = &Entry>

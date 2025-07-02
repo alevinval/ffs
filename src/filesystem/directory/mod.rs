@@ -4,3 +4,4 @@ pub use ntree::TreeNode as DirNode;
 
 mod entry;
 mod ntree;
+mod search;

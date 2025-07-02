@@ -3,12 +3,12 @@ pub use tree_node::TreeNode;
 #[cfg(feature = "std")]
 use std::println;
 
-mod tree_node;
-
 use crate::{
     BlockDevice, Error,
     filesystem::{Addr, Layout, directory::Entry, path},
 };
+
+mod tree_node;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct DirTree {}
