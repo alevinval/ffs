@@ -10,36 +10,45 @@ struct CacheEntry {
 }
 
 #[derive(Debug)]
-pub struct BlockCache<D: BlockDevice> {
-    device: D,
-    cache: [Option<CacheEntry>; 8],
+pub struct BlockCache<D: BlockDevice, const SIZE: usize = 8> {
+    delegate: D,
+    entries: [Option<CacheEntry>; SIZE],
 }
 
-impl<D: BlockDevice> BlockCache<D> {
+/// Implements an LRU cache for a [`BlockDevice`] to minimize the number of
+/// read and write operations to the underlying device. It can be used as a
+/// drop-in replacement for any [`BlockDevice`].
+impl<D: BlockDevice, const SIZE: usize> BlockCache<D, SIZE> {
+    /// Takes ownership of a [`BlockDevice`], and returns a new [`BlockCache`].
     pub const fn mount(device: D) -> Self {
-        Self { device, cache: [const { None }; 8] }
+        Self { delegate: device, entries: [const { None }; SIZE] }
     }
 
+    /// Returns ownership of the wrapped device.
     pub fn unmount(self) -> D {
-        self.device
+        self.delegate
     }
 
     fn get(&mut self, sector: Addr) -> Option<&mut Block> {
-        if let Some(pos) =
-            self.cache.iter().position(|e| e.as_ref().is_some_and(|e| e.sector == sector))
+        if let Some(pos) = self
+            .entries
+            .iter()
+            .position(|option| option.as_ref().is_some_and(|entry| entry.sector == sector))
         {
-            self.cache.swap(0, pos);
-            return self.cache[0].as_mut().map(|e| &mut e.block);
+            self.entries.swap(0, pos);
+            return self.entries[0].as_mut().map(|entry| &mut entry.block);
         }
         None
     }
 
     fn insert(&mut self, sector: Addr, block: Block) {
-        self.cache.rotate_right(1);
-        self.cache[0] = Some(CacheEntry { sector, block });
+        self.entries.rotate_right(1);
+        self.entries[0] = Some(CacheEntry { sector, block });
     }
 }
 
+/// Implements the [`BlockDevice`] trait for the [`BlockCache`]. Intercepting
+/// read and write operations to read and populate the cache.
 impl<D: BlockDevice> BlockDevice for BlockCache<D> {
     fn read_block(&mut self, sector: Addr, buf: &mut [u8]) -> Result<(), Error> {
         if let Some(block) = self.get(sector) {
@@ -47,7 +56,7 @@ impl<D: BlockDevice> BlockDevice for BlockCache<D> {
             return Ok(());
         }
 
-        self.device.read_block(sector, buf)?;
+        self.delegate.read_block(sector, buf)?;
         let block = Block::from_slice(buf);
         self.insert(sector, block);
 
@@ -55,7 +64,7 @@ impl<D: BlockDevice> BlockDevice for BlockCache<D> {
     }
 
     fn write_block(&mut self, sector: Addr, buf: &[u8]) -> Result<(), Error> {
-        self.device.write_block(sector, buf)?;
+        self.delegate.write_block(sector, buf)?;
         if let Some(block) = self.get(sector) {
             block.copy_from_slice(buf);
         }

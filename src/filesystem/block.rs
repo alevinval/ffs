@@ -17,9 +17,9 @@ impl Block {
         Self { inner: [0u8; Self::LEN] }
     }
 
-    pub const fn from_slice(slice: &[u8]) -> Self {
+    pub fn from_slice(slice: &[u8]) -> Self {
         let mut block = Self::new();
-        block.inner.copy_from_slice(slice);
+        block.inner[..slice.len()].copy_from_slice(slice);
         block
     }
 
