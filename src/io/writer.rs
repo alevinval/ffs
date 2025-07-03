@@ -1,4 +1,4 @@
-use crate::{Error, io::Write};
+use crate::io::{Error, Write};
 
 pub struct Writer<'a> {
     inner: &'a mut [u8],

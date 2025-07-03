@@ -85,7 +85,8 @@ impl Serializable for Free {
     ///
     /// Returns an error if `out` is too small to hold the serialized data.
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<usize, Error> {
-        writer.write(&self.inner)
+        let n = writer.write(&self.inner)?;
+        Ok(n)
     }
 }
 

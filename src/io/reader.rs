@@ -1,4 +1,4 @@
-use crate::{Error, io::Read};
+use crate::io::{Error, Read};
 
 pub struct Reader<'a> {
     buf: &'a [u8],

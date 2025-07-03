@@ -1,10 +1,15 @@
 pub use reader::Reader;
 pub use writer::Writer;
 
-use crate::{Error, filesystem::Addr};
+use crate::filesystem::Addr;
 
 mod reader;
 mod writer;
+
+pub enum Error {
+    /// The provided buffer is too small to fit the expected data.
+    BufferTooSmall { expected: usize, found: usize },
+}
 
 /// Trait `Write` writes data to a destination.
 pub trait Write {

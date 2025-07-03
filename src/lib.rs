@@ -43,3 +43,13 @@ pub enum Error {
     /// The operation is not supported by the current file system implementation.
     Unsupported,
 }
+
+impl From<io::Error> for Error {
+    fn from(value: io::Error) -> Self {
+        match value {
+            io::Error::BufferTooSmall { expected, found } => {
+                Self::BufferTooSmall { expected, found }
+            }
+        }
+    }
+}
