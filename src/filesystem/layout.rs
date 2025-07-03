@@ -14,7 +14,8 @@ pub struct Layout {
 
 impl Layout {
     pub const META: Self = Self::new(0, 1);
-    pub const TREE: Self = next(Self::META, N_TREE, DirectoryNode::SERDE_BLOCK_COUNT);
+    pub const TREE_FREE: Self = next(Self::META, 1, 1);
+    pub const TREE: Self = next(Self::TREE_FREE, N_TREE, DirectoryNode::SERDE_BLOCK_COUNT);
     pub const FILE: Self = next(Self::TREE, N_FILE, 1);
     pub const NODE: Self = next(Self::FILE, N_FILE, 1);
     pub const FREE: Self = next(Self::NODE, N_FREE, 1);
@@ -78,7 +79,8 @@ mod test {
 
     #[test]
     fn layout_ranges_are_continuous() {
-        assert_continuous_layout_range(Layout::META, Layout::TREE);
+        assert_continuous_layout_range(Layout::META, Layout::TREE_FREE);
+        assert_continuous_layout_range(Layout::TREE_FREE, Layout::TREE);
         assert_continuous_layout_range(Layout::TREE, Layout::FILE);
         assert_continuous_layout_range(Layout::FILE, Layout::NODE);
         assert_continuous_layout_range(Layout::NODE, Layout::FREE);

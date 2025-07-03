@@ -16,8 +16,8 @@ fn mount_device_formatted() {
     let sut = Controller::mount(device).expect("should mount on formatted device");
     let device = sut.unmount();
 
-    assert_eq!(1, device.reads_count);
-    assert_eq!(4, device.writes_count);
+    assert_eq!(2, device.reads_count);
+    assert_eq!(5, device.writes_count);
 }
 
 #[test]
@@ -28,8 +28,8 @@ fn create_file() {
         assert_eq!(Ok(1), ctrl.count_files());
     });
 
-    assert_eq!(15, device.reads_count);
-    assert_eq!(23, device.writes_count)
+    assert_eq!(22, device.reads_count);
+    assert_eq!(26, device.writes_count)
 }
 
 #[test]
@@ -44,8 +44,8 @@ fn create_then_delete_file() {
         assert_eq!(Ok(0), ctrl.count_files());
     });
 
-    assert_eq!(45, device.reads_count);
-    assert_eq!(38, device.writes_count)
+    assert_eq!(52, device.reads_count);
+    assert_eq!(41, device.writes_count)
 }
 
 #[test]
@@ -55,8 +55,8 @@ fn create_file_with_long_name_fails() {
         assert_eq!(Error::FileNameTooLong, ctrl.create(long_name, DATA_FIXTURE).unwrap_err());
     });
 
-    assert_eq!(1, device.reads_count);
-    assert_eq!(4, device.writes_count);
+    assert_eq!(2, device.reads_count);
+    assert_eq!(5, device.writes_count);
 }
 
 #[test]
@@ -66,8 +66,8 @@ fn create_file_with_data_too_big() {
         assert_eq!(Error::FileTooLarge, ctrl.create(FILE_PATH, &big_data).unwrap_err());
     });
 
-    assert_eq!(1, device.reads_count);
-    assert_eq!(4, device.writes_count);
+    assert_eq!(2, device.reads_count);
+    assert_eq!(5, device.writes_count);
 }
 
 #[test]
@@ -95,8 +95,8 @@ fn create_max_files() {
         }
     });
 
-    assert_eq!(12173, device.reads_count);
-    assert_eq!(7407, device.writes_count);
+    assert_eq!(10288, device.reads_count);
+    assert_eq!(7446, device.writes_count);
 }
 
 #[test]
@@ -112,8 +112,8 @@ fn create_file_twice_fails() {
         );
     });
 
-    assert_eq!(21, device.reads_count);
-    assert_eq!(23, device.writes_count);
+    assert_eq!(23, device.reads_count);
+    assert_eq!(26, device.writes_count);
 }
 
 #[test]
@@ -122,8 +122,8 @@ fn delete_file_that_does_not_exist() {
         assert_eq!(Error::FileNotFound, ctrl.delete(FILE_PATH).unwrap_err());
     });
 
-    assert_eq!(4, device.reads_count);
-    assert_eq!(4, device.writes_count);
+    assert_eq!(5, device.reads_count);
+    assert_eq!(5, device.writes_count);
 }
 
 fn device() -> MemoryDisk {

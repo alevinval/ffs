@@ -5,21 +5,27 @@ use crate::{
     BlockDevice, Error,
     filesystem::{
         Addr,
+        data_allocator::DataAllocator,
         directory::{Entry, ntree::TreeNode},
-        layout::Layout,
         path,
     },
 };
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct Tree {}
+#[derive(Debug)]
+pub struct Tree {
+    data_allocator: DataAllocator,
+}
 
 impl Tree {
-    pub fn insert_file<D>(&self, device: &mut D, file_path: &str) -> Result<Entry, Error>
+    pub const fn new(data_allocator: DataAllocator) -> Self {
+        Self { data_allocator }
+    }
+
+    pub fn insert_file<D>(&mut self, device: &mut D, file_path: &str) -> Result<Entry, Error>
     where
         D: BlockDevice,
     {
-        insert_file(device, file_path, 0)
+        insert_file(device, &mut self.data_allocator, file_path, 0)
     }
 
     pub fn remove_file<D>(&self, device: &mut D, file_path: &str) -> Result<(), Error>
@@ -91,6 +97,7 @@ fn get_file<D: BlockDevice>(device: &mut D, file_path: &str, addr: Addr) -> Resu
 
 fn insert_file<D: BlockDevice>(
     device: &mut D,
+    allocator: &mut DataAllocator,
     file_path: &str,
     addr: Addr,
 ) -> Result<Entry, Error> {
@@ -108,13 +115,13 @@ fn insert_file<D: BlockDevice>(
     let next_path = path::tail(file_path);
     let first_component = path::first_component(file_path);
     if let Some(entry) = current.find(first_component) {
-        return insert_file(device, next_path, entry.addr());
+        return insert_file(device, allocator, next_path, entry.addr());
     }
 
     // If we reach here, it means we need to create a new directory entry for the first component.
     // First check if the current node can fit another child directory.
     current.find_unset().ok_or(Error::StorageFull)?;
-    let next_addr = find_free_addr_for_direntry(device)?;
+    let next_addr = allocator.allocate(device)?;
     current.insert_node(first_component, next_addr)?;
 
     let entry = if path::dirname(path::tail(file_path)).is_empty() {
@@ -125,17 +132,7 @@ fn insert_file<D: BlockDevice>(
     entry.store(device, next_addr)?;
     current.store(device, addr)?;
 
-    insert_file(device, next_path, next_addr)
-}
-
-fn find_free_addr_for_direntry<D: BlockDevice>(device: &mut D) -> Result<Addr, Error> {
-    for (addr, _) in Layout::TREE.iter().skip(1) {
-        let entry = TreeNode::load(device, addr)?;
-        if entry.is_empty() {
-            return Ok(addr);
-        }
-    }
-    Err(Error::StorageFull)
+    insert_file(device, allocator, next_path, next_addr)
 }
 
 #[cfg(feature = "std")]

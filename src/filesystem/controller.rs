@@ -33,7 +33,7 @@ where
             return Err(Error::Unsupported);
         }
         let device = BlockCache::mount(device);
-        let directory = Directory {};
+        let directory = Directory::new(DataAllocator::new(Layout::TREE_FREE));
         let data_allocator = DataAllocator::new(Layout::FREE);
         Ok(Self { device, directory, data_allocator })
     }
@@ -44,7 +44,9 @@ where
 
     pub fn format(device: &mut D) -> Result<(), Error> {
         Meta::new().store(device)?;
-        DirectoryNode::new().store(device, 0)
+        DataAllocator::new(Layout::TREE_FREE).allocate(device)?;
+        DirectoryNode::new().store(device, 0)?;
+        Ok(())
     }
 
     pub fn create(&mut self, file_path: &str, data: &[u8]) -> Result<(), Error>

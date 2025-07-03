@@ -109,7 +109,7 @@ impl DataAllocator {
     /// # Notes
     /// - Uses a circular scan starting from `self.last_accessed` for improved allocation locality.
     /// - Updates `self.last_accessed` to the most recent allocation position to avoid always starting from 0.
-    fn allocate<D: BlockDevice>(&mut self, device: &mut D) -> Result<Addr, Error> {
+    pub fn allocate<D: BlockDevice>(&mut self, device: &mut D) -> Result<Addr, Error> {
         let mut block = Block::new();
 
         for (addr, sector) in self.layout.circular_iter(self.last_accessed) {
@@ -134,7 +134,11 @@ impl DataAllocator {
     /// # Notes
     /// - Safe to call multiple times on the same address, though redundant calls may have no effect.
     /// - May adjust `self.last_accessed` to improve future allocation locality.
-    fn release<D: BlockDevice>(&mut self, device: &mut D, data_sector: Addr) -> Result<(), Error> {
+    pub fn release<D: BlockDevice>(
+        &mut self,
+        device: &mut D,
+        data_sector: Addr,
+    ) -> Result<(), Error> {
         let logical_addr = to_free_logical(data_sector) as Addr;
         let free_sector = self.layout.nth(logical_addr);
         let offset = to_allocated_offset(data_sector);
