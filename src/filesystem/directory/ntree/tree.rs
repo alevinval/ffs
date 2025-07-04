@@ -60,7 +60,7 @@ impl Tree {
 
 fn remove_file<D: BlockDevice>(device: &mut D, file_path: &str, addr: Addr) -> Result<(), Error> {
     let mut current = TreeNode::load(device, addr)?;
-    if path::dirname(file_path).is_empty() {
+    if current.is_leaf() {
         let basename = path::basename(file_path);
         if let Some(entry) = current.find_mut(basename) {
             *entry = Entry::empty();
@@ -70,9 +70,9 @@ fn remove_file<D: BlockDevice>(device: &mut D, file_path: &str, addr: Addr) -> R
         return Err(Error::FileNotFound);
     }
 
-    let next_path = path::tail(file_path);
     let first_component = path::first_component(file_path);
     if let Some(entry) = current.find(first_component) {
+        let next_path = path::tail(file_path);
         return remove_file(device, next_path, entry.addr());
     }
     Err(Error::FileNotFound)
@@ -80,16 +80,16 @@ fn remove_file<D: BlockDevice>(device: &mut D, file_path: &str, addr: Addr) -> R
 
 fn get_file<D: BlockDevice>(device: &mut D, file_path: &str, addr: Addr) -> Result<Entry, Error> {
     let current = TreeNode::load(device, addr)?;
-    if path::dirname(file_path).is_empty() {
+    if current.is_leaf() {
         if let Some(entry) = current.find(path::basename(file_path)) {
             return Ok(entry.clone());
         }
         return Err(Error::FileNotFound);
     }
 
-    let next_path = path::tail(file_path);
     let first_component = path::first_component(file_path);
     if let Some(dir_ref) = current.find(first_component) {
+        let next_path = path::tail(file_path);
         return get_file(device, next_path, dir_ref.addr());
     }
     Err(Error::FileNotFound)

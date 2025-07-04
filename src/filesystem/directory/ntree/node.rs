@@ -33,15 +33,12 @@ impl TreeNode {
         Self { is_empty: false, is_leaf: true, entries }
     }
 
-    pub const fn is_empty(&self) -> bool {
-        self.is_empty
-    }
-
     pub const fn is_leaf(&self) -> bool {
         self.is_leaf
     }
 
     pub fn insert_node(&mut self, name: &str, addr: Addr) -> Result<Entry, Error> {
+        assert!(!self.is_leaf, "Cannot insert node into a leaf node");
         let (_, entry) = self.find_unset().ok_or(Error::StorageFull)?;
         let name = Name::new(name)?;
         let value = Entry::new(name, addr);
@@ -51,9 +48,7 @@ impl TreeNode {
     }
 
     pub fn insert_file(&mut self, name: &str, addr: Addr) -> Result<Entry, Error> {
-        if !self.is_leaf {
-            return Err(Error::Unsupported);
-        }
+        assert!(self.is_leaf, "Cannot insert file into a non-leaf node");
         let (pos, entry) = self.find_unset().ok_or(Error::StorageFull)?;
         let name = Name::new(name)?;
         let value = Entry::new(name, addr * Self::LEN as Addr + pos as Addr);
