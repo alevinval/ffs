@@ -52,40 +52,31 @@ impl<D> Store<D> for File
 where
     D: BlockDevice,
 {
-    fn store(&self, out: &mut D) -> Result<(), Error> {
+    fn store(&self, device: &mut D) -> Result<(), Error> {
         let sector = Layout::FILE.nth(self.node_addr);
         let mut block = Block::new();
         self.serialize(&mut block.writer())?;
-        out.write_block(sector, &block)
+        device.write(sector, &block)
     }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::test_utils::MockDevice;
+    use crate::{test_serde_symmetry, test_utils::MockDevice};
 
     use super::*;
 
-    #[test]
-    fn serde_symmetry() {
-        let mut block = Block::new();
-
-        let expected = File::new("test.txt".into(), 123);
-        assert_eq!(Ok(File::SERDE_LEN), expected.serialize(&mut block.writer()));
-        let actual = File::deserialize(&mut block.reader()).unwrap();
-
-        assert_eq!(expected, actual);
-    }
+    test_serde_symmetry!(File, File::new("text.txt".into(), 123));
 
     #[test]
     fn write_to_device() -> Result<(), Error> {
-        let mut out = MockDevice::new();
+        let mut device = MockDevice::new();
         let sut = File::new("some-file.txt".into(), 123);
-        sut.store(&mut out)?;
+        sut.store(&mut device)?;
 
         let mut expected = Block::new();
         sut.serialize(&mut expected.writer())?;
-        out.assert_write(0, Layout::FILE.nth(123), &expected);
+        device.assert_write(0, Layout::FILE.nth(123), &expected);
 
         Ok(())
     }

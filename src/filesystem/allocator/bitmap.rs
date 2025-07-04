@@ -4,24 +4,26 @@ use crate::{
     io::{Read, Write},
 };
 
-/// Tracks the free status of an address space.
+/// Tracks the free status of an address space, represented as a bitmap.
 #[derive(PartialEq, Eq, Debug)]
-pub struct Free {
+pub struct AllocationBitmap {
     inner: Block,
     last_free: usize,
 }
 
-impl Default for Free {
+impl Default for AllocationBitmap {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Free {
-    /// The number of addresses that can be tracked by a single [`Free`] instance.
+impl AllocationBitmap {
+    /// The number of addresses that can be tracked by a single [`AllocationBitmap`] instance.
     ///
-    /// Each [`Block`] contains `Block::LEN` bytes, each bit in the byte represents
-    /// the free status of an address.
+    /// Each [`Block`] contains [`Block::LEN`] bytes, each bit in the byte represents
+    /// the free status of an address within the address space.
+    ///
+    /// Thus, a single [`AllocationBitmap`] can track 4096 addresses.
     pub const SLOTS: usize = 8 * Block::LEN;
 
     /// Returns a [`Free`] instance with all addresses marked as free.
@@ -72,11 +74,11 @@ impl Free {
     }
 }
 
-impl SerdeLen for Free {
+impl SerdeLen for AllocationBitmap {
     const SERDE_LEN: usize = Block::LEN;
 }
 
-impl Serializable for Free {
+impl Serializable for AllocationBitmap {
     /// Serializes the [`Free`] instance into the provided byte slice.
     ///
     /// This copies the internal block state [`Self::inner`] into the first `[Block::LEN]` bytes of `out`.
@@ -90,7 +92,7 @@ impl Serializable for Free {
     }
 }
 
-impl Deserializable<Self> for Free {
+impl Deserializable<Self> for AllocationBitmap {
     /// Deserializes a [`Free`] instance from the given byte slice.
     ///
     /// This method copies the first [`Block::LEN`] bytes of `buf` into `[Self::inner]`
@@ -108,9 +110,11 @@ impl Deserializable<Self> for Free {
 #[cfg(test)]
 mod test {
 
+    use crate::test_serde_symmetry;
+
     use super::*;
 
-    fn take_nth_blocks(sut: &mut Free, n: usize) -> Option<Addr> {
+    fn take_nth_blocks(sut: &mut AllocationBitmap, n: usize) -> Option<Addr> {
         let mut last = None;
         for _ in 0..n {
             last = sut.allocate();
@@ -120,13 +124,13 @@ mod test {
 
     #[test]
     fn count_free_addresses() {
-        let sut = Free::new();
+        let sut = AllocationBitmap::new();
         assert_eq!(4096, sut.count_free_addresses())
     }
 
     #[test]
     fn take() {
-        let mut sut = Free::new();
+        let mut sut = AllocationBitmap::new();
         assert_eq!(Some(0), sut.allocate());
         assert_eq!(Some(1), sut.allocate());
         assert_eq!(Some(2), sut.allocate());
@@ -136,7 +140,7 @@ mod test {
 
     #[test]
     fn release() {
-        let mut sut = Free::new();
+        let mut sut = AllocationBitmap::new();
         assert_eq!(Some(4095), take_nth_blocks(&mut sut, 4096));
         assert_eq!(0, sut.count_free_addresses());
 
@@ -151,15 +155,12 @@ mod test {
         assert_eq!(Some(600), sut.allocate());
     }
 
-    #[test]
-    fn serde_symmetry() {
-        let mut expected = Free::new();
-        take_nth_blocks(&mut expected, 2048);
-
-        let mut block = Block::new();
-        assert_eq!(Ok(Free::SERDE_LEN), expected.serialize(&mut block.writer()));
-        let actual = Free::deserialize(&mut block.reader()).unwrap();
-
-        assert_eq!(expected.inner, actual.inner);
+    fn get_full_bitmap() -> AllocationBitmap {
+        let mut bitmap = AllocationBitmap::new();
+        take_nth_blocks(&mut bitmap, 2048);
+        bitmap.last_free = 0;
+        bitmap
     }
+
+    test_serde_symmetry!(AllocationBitmap, get_full_bitmap());
 }

@@ -50,21 +50,20 @@ impl<D: BlockDevice, const SIZE: usize> BlockCache<D, SIZE> {
 /// Implements the [`BlockDevice`] trait for the [`BlockCache`]. Intercepting
 /// read and write operations to read and populate the cache.
 impl<D: BlockDevice> BlockDevice for BlockCache<D> {
-    fn read_block(&mut self, sector: Addr, buf: &mut [u8]) -> Result<(), Error> {
+    fn read(&mut self, sector: Addr, buf: &mut [u8]) -> Result<(), Error> {
         if let Some(block) = self.get(sector) {
             buf.copy_from_slice(block);
             return Ok(());
         }
 
-        self.delegate.read_block(sector, buf)?;
+        self.delegate.read(sector, buf)?;
         let block = Block::from_slice(buf);
         self.insert(sector, block);
-
         Ok(())
     }
 
-    fn write_block(&mut self, sector: Addr, buf: &[u8]) -> Result<(), Error> {
-        self.delegate.write_block(sector, buf)?;
+    fn write(&mut self, sector: Addr, buf: &[u8]) -> Result<(), Error> {
+        self.delegate.write(sector, buf)?;
         if let Some(block) = self.get(sector) {
             block.copy_from_slice(buf);
         }

@@ -85,12 +85,12 @@ impl MemoryDisk {
 }
 
 impl BlockDevice for MemoryDisk {
-    fn read_block(&mut self, sector: Addr, buf: &mut [u8]) -> Result<(), Error> {
+    fn read(&mut self, sector: Addr, buf: &mut [u8]) -> Result<(), Error> {
         self.seek(self.block_size * sector as usize);
         self.read(buf)
     }
 
-    fn write_block(&mut self, sector: Addr, buf: &[u8]) -> Result<(), Error> {
+    fn write(&mut self, sector: Addr, buf: &[u8]) -> Result<(), Error> {
         self.seek(self.block_size * sector as usize);
         self.write(buf).map(|_| ())
     }

@@ -37,7 +37,7 @@ where
     fn load_from(&self, device: &mut D) -> Result<Self::Item, Error> {
         let sector = T::layout().nth(self.addr);
         let mut block = Block::new();
-        device.read_block(sector, &mut block)?;
+        device.read(sector, &mut block)?;
         T::deserialize(&mut block.reader())
     }
 }
@@ -47,10 +47,10 @@ where
     D: BlockDevice,
     T: Deserializable<T> + Addressable,
 {
-    fn erase_from(&self, out: &mut D) -> Result<(), Error> {
+    fn erase_from(&self, device: &mut D) -> Result<(), Error> {
         let sector = T::layout().nth(self.addr);
         let block = Block::new();
-        out.write_block(sector, &block)
+        device.write(sector, &block)
     }
 }
 

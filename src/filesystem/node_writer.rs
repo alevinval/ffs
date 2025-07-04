@@ -18,10 +18,10 @@ impl<D> Store<D> for NodeWriter<'_>
 where
     D: BlockDevice,
 {
-    fn store(&self, out: &mut D) -> Result<(), Error> {
+    fn store(&self, device: &mut D) -> Result<(), Error> {
         let mut block = Block::new();
         self.node.serialize(&mut block.writer())?;
-        out.write_block(Layout::NODE.nth(self.addr), &block)
+        device.write(Layout::NODE.nth(self.addr), &block)
     }
 }
 
@@ -33,14 +33,14 @@ mod test {
 
     #[test]
     fn write_to_device() {
-        let mut out = MockDevice::new();
+        let mut device = MockDevice::new();
         let node = &Node::new(1024, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
         let sut = NodeWriter::new(123, node);
-        assert_eq!(Ok(()), sut.store(&mut out));
+        assert_eq!(Ok(()), sut.store(&mut device));
 
         let mut expected = Block::new();
         assert_eq!(Ok(42), node.serialize(&mut expected.writer()));
 
-        out.assert_write(0, Layout::NODE.nth(123), &expected);
+        device.assert_write(0, Layout::NODE.nth(123), &expected);
     }
 }

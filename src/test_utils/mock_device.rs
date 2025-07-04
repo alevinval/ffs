@@ -26,7 +26,7 @@ impl MockDevice {
 }
 
 impl BlockDevice for MockDevice {
-    fn read_block(&mut self, sector: Addr, buf: &mut [u8]) -> Result<(), Error> {
+    fn read(&mut self, sector: Addr, buf: &mut [u8]) -> Result<(), Error> {
         self.reads.push((sector, buf.into()));
         for (s, write) in self.writes.iter() {
             if *s == sector {
@@ -37,7 +37,7 @@ impl BlockDevice for MockDevice {
         Ok(())
     }
 
-    fn write_block(&mut self, sector: Addr, buf: &[u8]) -> Result<(), Error> {
+    fn write(&mut self, sector: Addr, buf: &[u8]) -> Result<(), Error> {
         self.writes.push((sector, buf.into()));
         Ok(())
     }

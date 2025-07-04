@@ -2,8 +2,8 @@ use crate::{
     BlockDevice, Error,
     filesystem::{
         EraseFrom, Layout, LoadFrom, LoadFromStatic, Store,
+        allocator::{Allocator, DataAllocator},
         cache::BlockCache,
-        data_allocator::DataAllocator,
         data_writer::DataWriter,
         directory::{Directory, DirectoryNode},
         file::File,
@@ -21,7 +21,7 @@ where
 {
     device: BlockCache<D>,
     directory: Directory,
-    data_allocator: DataAllocator,
+    allocator: Allocator,
 }
 
 impl<D> Controller<D>
@@ -33,9 +33,9 @@ where
             return Err(Error::UnsupportedDevice);
         }
         let device = BlockCache::mount(device);
-        let directory = Directory::new(DataAllocator::new(Layout::TREE_FREE));
-        let data_allocator = DataAllocator::new(Layout::FREE);
-        Ok(Self { device, directory, data_allocator })
+        let directory = Directory::new(Allocator::new(Layout::TREE_BITMAP));
+        let allocator = Allocator::new(Layout::DATA_BITMAP);
+        Ok(Self { device, directory, allocator })
     }
 
     pub fn unmount(self) -> D {
@@ -44,7 +44,7 @@ where
 
     pub fn format(device: &mut D) -> Result<(), Error> {
         Meta::new().store(device)?;
-        DataAllocator::new(Layout::TREE_FREE).allocate(device)?;
+        Allocator::new(Layout::TREE_BITMAP).allocate(device)?;
         DirectoryNode::new().store(device, 0)?;
         Ok(())
     }
@@ -62,7 +62,7 @@ where
 
         let entry = self.directory.insert_file(&mut self.device, file_path)?;
         let file = File::new(*entry.name(), entry.addr());
-        let node = self.data_allocator.allocate_node_data(&mut self.device, file_size)?;
+        let node = self.allocator.allocate_node_data(&mut self.device, file_size)?;
         DataWriter::new(node.block_addrs(), data).store(&mut self.device)?;
         NodeWriter::new(file.node_addr(), &node).store(&mut self.device)?;
         file.store(&mut self.device)?;
@@ -81,7 +81,7 @@ where
         self.directory.remove_file(&mut self.device, file_path)?;
 
         // Release data blocks only after metadata is fully erased.
-        self.data_allocator.release_node_data(&mut self.device, &node)?;
+        self.allocator.release_node_data(&mut self.device, &node)?;
         Ok(())
     }
 
@@ -90,7 +90,21 @@ where
     }
 
     pub fn free_data_blocks(&mut self) -> Result<usize, Error> {
-        self.data_allocator.count_free_addresses(&mut self.device)
+        self.allocator.count_free_addresses(&mut self.device)
+    }
+
+    #[cfg(feature = "std")]
+    pub fn print_disk_layout(&self) {
+        use std::println;
+
+        println!("Disk layout:");
+        println!("  Meta: {:?}", Layout::META);
+        println!("  Tree bitmap: {:?}", Layout::TREE_BITMAP);
+        println!("  Tree: {:?}", Layout::TREE);
+        println!("  File: {:?}", Layout::FILE);
+        println!("  Node: {:?}", Layout::NODE);
+        println!("  Data bitmap: {:?}", Layout::DATA_BITMAP);
+        println!("  Data: {:?}", Layout::DATA);
     }
 
     #[cfg(feature = "std")]

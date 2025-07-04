@@ -1,9 +1,11 @@
-use crate::filesystem::{Addr, SerdeLen, directory::DirectoryNode, free::Free, node::Node};
+use crate::filesystem::{
+    Addr, SerdeLen, allocator::Allocator, directory::DirectoryNode, node::Node,
+};
 
 const N_TREE: usize = 100;
 const N_FILE: usize = N_TREE * DirectoryNode::LEN;
 const N_DATA: usize = Node::BLOCKS_PER_NODE * N_FILE;
-const N_FREE: usize = N_DATA / Free::SLOTS;
+const N_FREE: usize = N_DATA / Allocator::SLOTS;
 
 #[derive(Debug)]
 pub struct Layout {
@@ -14,12 +16,12 @@ pub struct Layout {
 
 impl Layout {
     pub const META: Self = Self::new(0, 1);
-    pub const TREE_FREE: Self = next(Self::META, 1, 1);
-    pub const TREE: Self = next(Self::TREE_FREE, N_TREE, DirectoryNode::SERDE_BLOCK_COUNT);
+    pub const TREE_BITMAP: Self = next(Self::META, 1, 1);
+    pub const TREE: Self = next(Self::TREE_BITMAP, N_TREE, DirectoryNode::SERDE_BLOCK_COUNT);
     pub const FILE: Self = next(Self::TREE, N_FILE, 1);
     pub const NODE: Self = next(Self::FILE, N_FILE, 1);
-    pub const FREE: Self = next(Self::NODE, N_FREE, 1);
-    pub const DATA: Self = next(Self::FREE, N_DATA, 1);
+    pub const DATA_BITMAP: Self = next(Self::NODE, N_FREE, 1);
+    pub const DATA: Self = next(Self::DATA_BITMAP, N_DATA, 1);
 
     pub const fn new(begin: Addr, capacity: Addr) -> Self {
         Self::new_with_size(begin, capacity, 1)
@@ -79,12 +81,12 @@ mod test {
 
     #[test]
     fn layout_ranges_are_continuous() {
-        assert_continuous_layout_range(Layout::META, Layout::TREE_FREE);
-        assert_continuous_layout_range(Layout::TREE_FREE, Layout::TREE);
+        assert_continuous_layout_range(Layout::META, Layout::TREE_BITMAP);
+        assert_continuous_layout_range(Layout::TREE_BITMAP, Layout::TREE);
         assert_continuous_layout_range(Layout::TREE, Layout::FILE);
         assert_continuous_layout_range(Layout::FILE, Layout::NODE);
-        assert_continuous_layout_range(Layout::NODE, Layout::FREE);
-        assert_continuous_layout_range(Layout::FREE, Layout::DATA);
+        assert_continuous_layout_range(Layout::NODE, Layout::DATA_BITMAP);
+        assert_continuous_layout_range(Layout::DATA_BITMAP, Layout::DATA);
     }
 
     #[test]

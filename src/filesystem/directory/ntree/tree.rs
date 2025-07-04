@@ -5,7 +5,7 @@ use crate::{
     BlockDevice, Error,
     filesystem::{
         Addr,
-        data_allocator::DataAllocator,
+        allocator::Allocator,
         directory::{Entry, ntree::TreeNode},
         path,
     },
@@ -13,19 +13,19 @@ use crate::{
 
 #[derive(Debug)]
 pub struct Tree {
-    data_allocator: DataAllocator,
+    allocator: Allocator,
 }
 
 impl Tree {
-    pub const fn new(data_allocator: DataAllocator) -> Self {
-        Self { data_allocator }
+    pub const fn new(allocator: Allocator) -> Self {
+        Self { allocator }
     }
 
     pub fn insert_file<D>(&mut self, device: &mut D, file_path: &str) -> Result<Entry, Error>
     where
         D: BlockDevice,
     {
-        insert_file(device, &mut self.data_allocator, file_path, 0)
+        insert_file(device, &mut self.allocator, file_path, 0)
     }
 
     pub fn remove_file<D>(&self, device: &mut D, file_path: &str) -> Result<(), Error>
@@ -97,7 +97,7 @@ fn get_file<D: BlockDevice>(device: &mut D, file_path: &str, addr: Addr) -> Resu
 
 fn insert_file<D: BlockDevice>(
     device: &mut D,
-    allocator: &mut DataAllocator,
+    allocator: &mut Allocator,
     file_path: &str,
     addr: Addr,
 ) -> Result<Entry, Error> {

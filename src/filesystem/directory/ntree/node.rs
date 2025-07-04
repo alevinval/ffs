@@ -85,7 +85,7 @@ impl TreeNode {
         let start_sector = Self::LAYOUT.nth(idx);
 
         for (i, chunk) in buffer.chunks_mut(Block::LEN).enumerate() {
-            device.read_block(start_sector + i as Addr, chunk)?;
+            device.read(start_sector + i as Addr, chunk)?;
         }
 
         let mut reader = Reader::new(&buffer);
@@ -102,7 +102,7 @@ impl TreeNode {
         self.serialize(&mut writer)?;
 
         for (i, chunk) in buffer.chunks(Block::LEN).enumerate() {
-            device.write_block(start_sector + i as Addr, chunk)?;
+            device.write(start_sector + i as Addr, chunk)?;
         }
         Ok(())
     }

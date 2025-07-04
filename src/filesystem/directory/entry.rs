@@ -68,18 +68,9 @@ impl Deserializable<Self> for Entry {
 #[cfg(test)]
 mod test {
 
+    use crate::test_serde_symmetry;
+
     use super::*;
 
-    use crate::filesystem::Block;
-
-    #[test]
-    fn serde_symmetry() {
-        let mut block = Block::new();
-
-        let expected = Entry::new("test_file".into(), 1);
-        assert_eq!(Ok(Entry::SERDE_LEN), expected.serialize(&mut block.writer()));
-        let actual = Entry::deserialize(&mut block.reader()).unwrap();
-
-        assert_eq!(expected, actual);
-    }
+    test_serde_symmetry!(Entry, Entry::new("test_file".into(), 1));
 }

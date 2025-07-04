@@ -28,7 +28,7 @@ where
         for (i, chunk) in self.data.chunks(Block::LEN).enumerate() {
             let addr = self.block_addrs[i];
             let sector = Layout::DATA.nth(addr);
-            device.write_block(sector, chunk)?;
+            device.write(sector, chunk)?;
         }
         Ok(())
     }
@@ -43,29 +43,29 @@ mod test {
 
     #[test]
     fn write_single_chunk() -> Result<(), Error> {
-        let mut out = MockDevice::new();
+        let mut device = MockDevice::new();
         let sut = DataWriter::new(&[0, 1, 2, 3], b"hello world");
 
-        sut.store(&mut out)?;
+        sut.store(&mut device)?;
 
-        assert_eq!(1, out.writes.len());
-        out.assert_write(0, Layout::DATA.nth(0), b"hello world");
+        assert_eq!(1, device.writes.len());
+        device.assert_write(0, Layout::DATA.nth(0), b"hello world");
         Ok(())
     }
 
     #[test]
     fn write_multiple_chunks() -> Result<(), Error> {
-        let mut out = MockDevice::new();
+        let mut device = MockDevice::new();
         let sut = DataWriter::new(&[0, 1, 2, 3, 4], &[13u8; 2500]);
-        sut.store(&mut out)?;
+        sut.store(&mut device)?;
 
-        assert_eq!(5, out.writes.len());
+        assert_eq!(5, device.writes.len());
 
-        out.assert_write(0, Layout::DATA.nth(0), &[13u8; Block::LEN]);
-        out.assert_write(1, Layout::DATA.nth(1), &[13u8; Block::LEN]);
-        out.assert_write(2, Layout::DATA.nth(2), &[13u8; Block::LEN]);
-        out.assert_write(3, Layout::DATA.nth(3), &[13u8; Block::LEN]);
-        out.assert_write(4, Layout::DATA.nth(4), &[13u8; Block::LEN][0..452]);
+        device.assert_write(0, Layout::DATA.nth(0), &[13u8; Block::LEN]);
+        device.assert_write(1, Layout::DATA.nth(1), &[13u8; Block::LEN]);
+        device.assert_write(2, Layout::DATA.nth(2), &[13u8; Block::LEN]);
+        device.assert_write(3, Layout::DATA.nth(3), &[13u8; Block::LEN]);
+        device.assert_write(4, Layout::DATA.nth(4), &[13u8; Block::LEN][0..452]);
 
         Ok(())
     }

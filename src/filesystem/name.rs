@@ -137,20 +137,11 @@ impl From<std::string::String> for Name {
 #[cfg(test)]
 mod tests {
 
-    use crate::filesystem::Block;
+    use crate::test_serde_symmetry;
 
     use super::*;
 
-    #[test]
-    fn serde_symmetry() {
-        let mut block = Block::new();
-
-        let expected = Name::new("test_file").unwrap();
-        assert_eq!(Ok(Name::SERDE_LEN), expected.serialize(&mut block.writer()));
-        let actual = Name::deserialize(&mut block.reader()).unwrap();
-
-        assert_eq!(expected, actual);
-    }
+    test_serde_symmetry!(Name, Name::new("test_file").unwrap());
 
     #[test]
     fn name_fits() {

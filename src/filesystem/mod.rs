@@ -7,18 +7,16 @@ use crate::{
     io::{Read, Write},
 };
 use block::Block;
-use free::Free;
 use layout::Layout;
 use node::Node;
 
+pub mod allocator;
 mod block;
 mod cache;
 mod controller;
-mod data_allocator;
 mod data_writer;
 mod directory;
 mod file;
-mod free;
 mod handle;
 mod layout;
 mod meta;
@@ -48,9 +46,9 @@ where
 }
 
 pub trait BlockDevice {
-    fn read_block(&mut self, sector: Addr, buf: &mut [u8]) -> Result<(), Error>;
+    fn read(&mut self, sector: Addr, buf: &mut [u8]) -> Result<(), Error>;
 
-    fn write_block(&mut self, sector: Addr, buf: &[u8]) -> Result<(), Error>;
+    fn write(&mut self, sector: Addr, buf: &[u8]) -> Result<(), Error>;
 }
 
 pub trait Addressable {

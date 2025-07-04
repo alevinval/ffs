@@ -1,63 +1,35 @@
 use crate::{
     BlockDevice, Error,
-    filesystem::{Addr, Block, Deserializable, Free, Node, Serializable, layout::Layout},
+    filesystem::{
+        Addr, Block, Deserializable, Serializable, allocator::bitmap::AllocationBitmap,
+        layout::Layout, node::Node,
+    },
 };
 
+mod bitmap;
+
 #[derive(Debug)]
-pub struct DataAllocator {
+pub struct Allocator {
     layout: Layout,
     last_accessed: Addr,
 }
 
-impl DataAllocator {
+impl Allocator {
+    pub const SLOTS: usize = AllocationBitmap::SLOTS;
+
     pub const fn new(layout: Layout) -> Self {
         Self { last_accessed: 0, layout }
-    }
-
-    /// Attempts to allocate enough blocks to fit `file_size` bytes and returns a [`Node`] instance
-    /// with all the allocated addresses.
-    pub fn allocate_node_data<D: BlockDevice>(
-        &mut self,
-        device: &mut D,
-        file_size: usize,
-    ) -> Result<Node, Error> {
-        let mut block_addrs = [0; Node::BLOCKS_PER_NODE];
-        self.allocate_bytes(device, file_size, &mut block_addrs)?;
-        Ok(Node::new(file_size as u16, block_addrs))
-    }
-
-    /// Releases all blocks associated with the given [`Node`].
-    pub fn release_node_data<D: BlockDevice>(
-        &mut self,
-        device: &mut D,
-        node: &Node,
-    ) -> Result<(), Error> {
-        for addr in node.block_addrs() {
-            self.release(device, *addr)?;
-        }
-        Ok(())
     }
 
     pub fn count_free_addresses<D: BlockDevice>(&self, device: &mut D) -> Result<usize, Error> {
         let mut block = Block::new();
         let mut total = 0;
-
         for sector in self.layout.iter_sectors() {
-            device.read_block(sector, &mut block)?;
-            let free = Free::deserialize(&mut block.reader())?;
-            total += free.count_free_addresses();
+            device.read(sector, &mut block)?;
+            let bitmap = AllocationBitmap::deserialize(&mut block.reader())?;
+            total += bitmap.count_free_addresses();
         }
         Ok(total)
-    }
-
-    /// Attempts to allocate enough blocks to fit `file_size` bytes.
-    fn allocate_bytes<D: BlockDevice>(
-        &mut self,
-        device: &mut D,
-        file_size: usize,
-        out: &mut [Addr],
-    ) -> Result<(), Error> {
-        self.allocate_n(device, file_size.div_ceil(Block::LEN), out)
     }
 
     /// Attempts to allocate `n` blocks and stores the allocated indices in the provided `buffer`.
@@ -72,25 +44,25 @@ impl DataAllocator {
     /// - `Err(Error::StorageFull)` if fewer than `n` blocks could be allocated. In this case,
     ///   allocated blocks will be automatically released.
     ///
-    fn allocate_n<D: BlockDevice>(
+    pub fn allocate_n<D: BlockDevice>(
         &mut self,
         device: &mut D,
+        addrs: &mut [Addr],
         n: usize,
-        out: &mut [Addr],
     ) -> Result<(), Error> {
-        if out.len() < n {
-            return Err(Error::BufferTooSmall { expected: n, found: out.len() });
+        if addrs.len() < n {
+            return Err(Error::BufferTooSmall { expected: n, found: addrs.len() });
         }
 
-        let mut count = 0;
-        while count < n {
+        let mut current = 0;
+        while current < n {
             match self.allocate(device) {
                 Ok(addr) => {
-                    out[count] = addr;
-                    count += 1;
+                    addrs[current] = addr;
+                    current += 1;
                 }
                 Err(_) => {
-                    for addr in out.iter().take(count) {
+                    for addr in addrs.iter().take(current) {
                         self.release(device, *addr)?;
                     }
                     return Err(Error::StorageFull);
@@ -113,14 +85,14 @@ impl DataAllocator {
         let mut block = Block::new();
 
         for (addr, sector) in self.layout.circular_iter(self.last_accessed) {
-            device.read_block(sector, &mut block)?;
-            let mut free = Free::deserialize(&mut block.reader())?;
+            device.read(sector, &mut block)?;
+            let mut bitmap = AllocationBitmap::deserialize(&mut block.reader())?;
 
-            if let Some(allocation) = free.allocate() {
-                free.serialize(&mut block.writer())?;
-                device.write_block(sector, &block)?;
+            if let Some(allocation) = bitmap.allocate() {
+                bitmap.serialize(&mut block.writer())?;
+                device.write(sector, &block)?;
                 self.last_accessed = addr;
-                return Ok(to_data_sector(addr, allocation));
+                return Ok(to_addr(addr, allocation));
             }
         }
         Err(Error::StorageFull)
@@ -134,39 +106,78 @@ impl DataAllocator {
     /// # Notes
     /// - Safe to call multiple times on the same address, though redundant calls may have no effect.
     /// - May adjust `self.last_accessed` to improve future allocation locality.
-    pub fn release<D: BlockDevice>(
-        &mut self,
-        device: &mut D,
-        data_sector: Addr,
-    ) -> Result<(), Error> {
-        let logical_addr = to_free_logical(data_sector) as Addr;
-        let free_sector = self.layout.nth(logical_addr);
-        let offset = to_allocated_offset(data_sector);
+    pub fn release<D: BlockDevice>(&mut self, device: &mut D, addr: Addr) -> Result<(), Error> {
+        let bitmap_addr = to_bitmap_addr(addr) as Addr;
+        let bitmap_sector = self.layout.nth(bitmap_addr);
+        let bitmap_offset = to_bitmap_offset(addr);
 
         let mut block = Block::new();
-        device.read_block(free_sector, &mut block)?;
-        let mut free = Free::deserialize(&mut block.reader())?;
+        device.read(bitmap_sector, &mut block)?;
 
-        free.release(offset);
-        free.serialize(&mut block.writer())?;
-        device.write_block(free_sector, &block)?;
-        if logical_addr < self.last_accessed {
-            self.last_accessed = logical_addr;
+        let mut bitmap = AllocationBitmap::deserialize(&mut block.reader())?;
+        bitmap.release(bitmap_offset);
+        bitmap.serialize(&mut block.writer())?;
+
+        device.write(bitmap_sector, &block)?;
+        if bitmap_addr < self.last_accessed {
+            self.last_accessed = bitmap_addr;
         }
         Ok(())
     }
 }
 
-const fn to_allocated_offset(addr: Addr) -> Addr {
-    addr % Free::SLOTS as Addr
+/// Provides utility functions so the [`Allocator`] can work with [`Node`] and file data.
+pub trait DataAllocator {
+    fn allocate_node_data<D: BlockDevice>(
+        &mut self,
+        device: &mut D,
+        file_size: usize,
+    ) -> Result<Node, Error>;
+
+    fn release_node_data<D: BlockDevice>(
+        &mut self,
+        device: &mut D,
+        node: &Node,
+    ) -> Result<(), Error>;
 }
 
-const fn to_free_logical(addr: Addr) -> usize {
-    addr as usize / Free::SLOTS
+impl DataAllocator for Allocator {
+    /// Attempts to allocate enough blocks to fit `file_size` bytes and returns a [`Node`] instance
+    /// with all the allocated addresses.
+    fn allocate_node_data<D: BlockDevice>(
+        &mut self,
+        device: &mut D,
+        file_size: usize,
+    ) -> Result<Node, Error> {
+        let mut block_addrs = [0; Node::BLOCKS_PER_NODE];
+        self.allocate_n(device, &mut block_addrs, file_size.div_ceil(Block::LEN))?;
+        Ok(Node::new(file_size as u16, block_addrs))
+    }
+
+    /// Attempts to allocate enough blocks to fit `file_size` bytes and returns a [`Node`] instance
+    /// with all the allocated addresses.
+    fn release_node_data<D: BlockDevice>(
+        &mut self,
+        device: &mut D,
+        node: &Node,
+    ) -> Result<(), Error> {
+        for addr in node.block_addrs() {
+            self.release(device, *addr)?;
+        }
+        Ok(())
+    }
 }
 
-const fn to_data_sector(free_sector: Addr, allocation: Addr) -> Addr {
-    free_sector * Free::SLOTS as Addr + allocation
+const fn to_bitmap_offset(addr: Addr) -> Addr {
+    addr % AllocationBitmap::SLOTS as Addr
+}
+
+const fn to_bitmap_addr(addr: Addr) -> Addr {
+    addr / AllocationBitmap::SLOTS as Addr
+}
+
+const fn to_addr(bitmap_addr: Addr, allocated_addr: Addr) -> Addr {
+    bitmap_addr * AllocationBitmap::SLOTS as Addr + allocated_addr
 }
 
 #[cfg(test)]
@@ -177,14 +188,14 @@ mod test {
 
     const TEST_LAYOUT: Layout = Layout::new(0, 2);
 
-    fn get_sut() -> (MemoryDisk, DataAllocator) {
+    fn get_sut() -> (MemoryDisk, Allocator) {
         let device = MemoryDisk::fit(TEST_LAYOUT.sector_count());
-        let sut = DataAllocator::new(TEST_LAYOUT);
+        let sut = Allocator::new(TEST_LAYOUT);
         (device, sut)
     }
 
     fn take_nth_blocks<D: BlockDevice>(
-        sut: &mut DataAllocator,
+        sut: &mut Allocator,
         device: &mut D,
         n: usize,
     ) -> Result<Addr, Error> {
@@ -193,25 +204,6 @@ mod test {
             last = sut.allocate(device);
         }
         last
-    }
-
-    #[test]
-    fn allocate_bytes() {
-        let (mut device, mut sut) = get_sut();
-        sut.allocate(&mut device).unwrap();
-
-        let mut out = [0; 4];
-        sut.allocate_bytes(&mut device, 1, &mut out).unwrap();
-        assert_eq!([1, 0, 0, 0], out);
-
-        sut.allocate_bytes(&mut device, 128, &mut out).unwrap();
-        assert_eq!([2, 0, 0, 0], out);
-
-        sut.allocate_bytes(&mut device, 512, &mut out).unwrap();
-        assert_eq!([3, 0, 0, 0], out);
-
-        sut.allocate_bytes(&mut device, 1500, &mut out).unwrap();
-        assert_eq!([4, 5, 6, 0], out);
     }
 
     #[test]
@@ -251,7 +243,7 @@ mod test {
         assert_eq!(Ok(0), sut.count_free_addresses(&mut device));
 
         let mut addrs = [0; 10];
-        assert_eq!(Err(Error::StorageFull), sut.allocate_n(&mut device, 8, &mut addrs));
+        assert_eq!(Err(Error::StorageFull), sut.allocate_n(&mut device, &mut addrs, 8));
 
         // Release sparse addresses
         assert_eq!(Ok(()), sut.release(&mut device, 100));
@@ -263,14 +255,31 @@ mod test {
         assert_eq!(Ok(()), sut.release(&mut device, 7500));
         assert_eq!(Ok(()), sut.release(&mut device, 1300));
 
-        assert_eq!(Ok(()), sut.allocate_n(&mut device, 8, &mut addrs));
+        assert_eq!(Ok(()), sut.allocate_n(&mut device, &mut addrs, 8));
         assert_eq!([100, 200, 300, 1000, 1300, 2000, 3000, 7500], addrs[0..8]);
 
         // Now reproduce a rollback
         addrs[0..8].iter().for_each(|n| sut.release(&mut device, *n).unwrap());
 
         assert_eq!(Ok(8), sut.count_free_addresses(&mut device));
-        assert_eq!(Err(Error::StorageFull), sut.allocate_n(&mut device, 10, &mut addrs));
+        assert_eq!(Err(Error::StorageFull), sut.allocate_n(&mut device, &mut addrs, 10));
         assert_eq!(Ok(8), sut.count_free_addresses(&mut device));
+    }
+
+    #[test]
+    fn allocate_node_data() {
+        let (mut device, mut sut) = get_sut();
+
+        let node = sut.allocate_node_data(&mut device, 1).unwrap();
+        assert_eq!([0, 0, 0, 0, 0, 0, 0, 0, 0, 0], node.block_addrs());
+
+        let node = sut.allocate_node_data(&mut device, 128).unwrap();
+        assert_eq!([1, 0, 0, 0, 0, 0, 0, 0, 0, 0], node.block_addrs());
+
+        let node = sut.allocate_node_data(&mut device, 512).unwrap();
+        assert_eq!([2, 0, 0, 0, 0, 0, 0, 0, 0, 0], node.block_addrs());
+
+        let node = sut.allocate_node_data(&mut device, 1500).unwrap();
+        assert_eq!([3, 4, 5, 0, 0, 0, 0, 0, 0, 0], node.block_addrs());
     }
 }

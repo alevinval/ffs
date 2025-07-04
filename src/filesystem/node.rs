@@ -61,16 +61,9 @@ impl Deserializable<Self> for Node {
 #[cfg(test)]
 mod test {
 
+    use crate::test_serde_symmetry;
+
     use super::*;
 
-    #[test]
-    fn serde_symmetry() {
-        let mut block = Block::new();
-
-        let expected = Node::new(5120, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-        assert_eq!(Ok(Node::SERDE_LEN), expected.serialize(&mut block.writer()));
-        let actual = Node::deserialize(&mut block.reader()).unwrap();
-
-        assert_eq!(expected, actual);
-    }
+    test_serde_symmetry!(Node, Node::new(5120, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]));
 }
