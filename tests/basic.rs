@@ -6,7 +6,7 @@ const DATA_FIXTURE: &[u8] = b"some data for file";
 #[test]
 fn mount_device_unsupported() {
     let device = MemoryDisk::new(512, 2048);
-    assert_eq!(Error::Unsupported, Controller::mount(device).unwrap_err());
+    assert_eq!(Error::UnsupportedDevice, Controller::mount(device).unwrap_err());
 }
 
 #[test]

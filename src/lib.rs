@@ -8,8 +8,7 @@ pub(crate) mod test_utils;
 
 pub use filesystem::{BlockDevice, Controller};
 
-use crate::filesystem::DirectoryNode;
-use crate::filesystem::Name;
+use crate::filesystem::{DirectoryNode, Name};
 
 #[cfg(feature = "test-support")]
 pub mod disk;
@@ -30,18 +29,16 @@ pub enum Error {
     BufferTooSmall { expected: usize, found: usize },
     /// The file already exists.
     FileAlreadyExists,
-    /// The file name exceeds the maximum allowed length.
+    /// The name exceeds the maximum allowed length.
     FileNameTooLong,
     /// The file does not exist.
     FileNotFound,
     /// The file is too large to be stored.
     FileTooLarge,
-    /// The file name is invalid (e.g., contains invalid UTF-8).
-    InvalidFileName,
     /// The file system is full and cannot accommodate more files.
     StorageFull,
-    /// The operation is not supported by the current file system implementation.
-    Unsupported,
+    /// The device is not formatted correctly.
+    UnsupportedDevice,
 }
 
 impl From<io::Error> for Error {

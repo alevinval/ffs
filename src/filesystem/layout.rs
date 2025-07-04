@@ -1,4 +1,4 @@
-use crate::filesystem::{Addr, DirectoryNode, SerdeLen, free::Free, node::Node};
+use crate::filesystem::{Addr, SerdeLen, directory::DirectoryNode, free::Free, node::Node};
 
 const N_TREE: usize = 100;
 const N_FILE: usize = N_TREE * DirectoryNode::LEN;

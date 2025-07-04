@@ -30,7 +30,7 @@ where
 {
     pub fn mount(mut device: D) -> Result<Self, Error> {
         if Meta::load_from(&mut device)? != Meta::new() {
-            return Err(Error::Unsupported);
+            return Err(Error::UnsupportedDevice);
         }
         let device = BlockCache::mount(device);
         let directory = Directory::new(DataAllocator::new(Layout::TREE_FREE));
