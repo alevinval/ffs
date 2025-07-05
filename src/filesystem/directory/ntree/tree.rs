@@ -52,14 +52,30 @@ impl Tree {
     where
         D: BlockDevice,
     {
-        count_files(device, 0)
+        let mut count = 0;
+        let mut count_files = |node: &TreeNode, _depth: usize| {
+            if node.is_leaf() {
+                count += node.iter_entries().count();
+            }
+            Ok(())
+        };
+        visit_tree(device, 0, &mut count_files, 0)?;
+        Ok(count)
     }
 
     pub fn count_dirs<D>(&self, device: &mut D) -> Result<usize, Error>
     where
         D: BlockDevice,
     {
-        count_dirs(device, 0)
+        let mut count = 0;
+        let mut count_dirs = |node: &TreeNode, _detph: usize| {
+            if !node.is_leaf() {
+                count += node.iter_entries().count();
+            }
+            Ok(())
+        };
+        visit_tree(device, 0, &mut count_dirs, 0)?;
+        Ok(count)
     }
 
     pub fn print_tree<D, W>(&self, device: &mut D, out: &mut W) -> Result<(), Error>
@@ -67,7 +83,31 @@ impl Tree {
         D: BlockDevice,
         W: fmt::Write,
     {
-        print_tree_inner(device, out, 0, 0, 0)
+        let mut visitor = |node: &TreeNode, depth: usize| {
+            if depth == 0 {
+                out.write_str("$/\n")?;
+            }
+            if node.is_leaf() {
+                for entry in node.iter_entries() {
+                    out.write_fmt(format_args!(
+                        "{}{}\n",
+                        "  ".repeat(depth + 2),
+                        entry.name().as_str()
+                    ))?;
+                }
+            } else {
+                for entry in node.iter_entries() {
+                    out.write_fmt(format_args!(
+                        "{}{}/\n",
+                        "  ".repeat(depth + 1),
+                        entry.name().as_str()
+                    ))?;
+                }
+            }
+            Ok(())
+        };
+        visit_tree(device, 0, &mut visitor, 0)?;
+        Ok(())
     }
 
     #[cfg(feature = "std")]
@@ -193,67 +233,25 @@ fn prune<D: BlockDevice>(
     }
 }
 
-#[cfg(feature = "std")]
-fn print_tree_inner<W: fmt::Write, D: BlockDevice>(
+fn visit_tree<V, D: BlockDevice>(
     device: &mut D,
-    out: &mut W,
     addr: Addr,
+    visitor: &mut V,
     depth: usize,
-    max_depth: usize,
-) -> Result<(), Error> {
-    if max_depth > 0 && depth >= max_depth {
-        return Ok(());
-    }
-
+) -> Result<(), Error>
+where
+    V: FnMut(&TreeNode, usize) -> Result<(), Error>,
+{
     let current_node = TreeNode::load(device, addr)?;
+    visitor(&current_node, depth)?;
 
-    if addr == 0 {
-        out.write_str("$/\n")?;
-    }
-
-    if current_node.is_leaf() {
+    if !current_node.is_leaf() {
         for entry in current_node.iter_entries() {
-            out.write_fmt(format_args!("{}{}\n", "  ".repeat(depth + 2), entry.name().as_str()))?;
-        }
-    } else {
-        for entry in current_node.iter_entries() {
-            out.write_fmt(format_args!("{}{}/\n", "  ".repeat(depth + 1), entry.name().as_str()))?;
-            print_tree_inner(device, out, entry.addr(), depth + 1, max_depth)?
+            visit_tree(device, entry.addr(), visitor, depth + 1)?;
         }
     }
 
     Ok(())
-}
-
-fn count_files<D>(device: &mut D, addr: Addr) -> Result<usize, Error>
-where
-    D: BlockDevice,
-{
-    let current_node = TreeNode::load(device, addr)?;
-    if current_node.is_leaf() {
-        Ok(current_node.iter_entries().count())
-    } else {
-        let mut count = 0;
-        for dir_ref in current_node.iter_entries() {
-            count += count_files(device, dir_ref.addr())?;
-        }
-        Ok(count)
-    }
-}
-
-fn count_dirs<D>(device: &mut D, addr: Addr) -> Result<usize, Error>
-where
-    D: BlockDevice,
-{
-    let current_node = TreeNode::load(device, addr)?;
-    if current_node.is_leaf() {
-        return Ok(1);
-    }
-    let mut count = 1;
-    for entry in current_node.iter_entries() {
-        count += count_dirs(device, entry.addr())?;
-    }
-    Ok(count)
 }
 
 #[cfg(test)]
