@@ -1,3 +1,5 @@
+use core::fmt;
+
 pub use reader::Reader;
 pub use writer::Writer;
 
@@ -5,6 +7,16 @@ use crate::filesystem::Addr;
 
 mod reader;
 mod writer;
+
+#[cfg(feature = "std")]
+pub struct StdoutFmtWriter;
+
+impl fmt::Write for StdoutFmtWriter {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        use std::io::{self, Write};
+        io::stdout().write_all(s.as_bytes()).map_err(|_| fmt::Error)
+    }
+}
 
 pub enum Error {
     /// The provided buffer is too small to fit the expected data.

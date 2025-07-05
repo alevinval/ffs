@@ -6,6 +6,8 @@ extern crate std;
 #[cfg(test)]
 pub(crate) mod test_utils;
 
+use core::fmt;
+
 pub use filesystem::{BlockDevice, Controller};
 
 use crate::filesystem::{DirectoryNode, Name};
@@ -39,6 +41,8 @@ pub enum Error {
     StorageFull,
     /// The device is not formatted correctly.
     UnsupportedDevice,
+    /// Unexpected
+    Unexpected,
 }
 
 impl From<io::Error> for Error {
@@ -48,5 +52,11 @@ impl From<io::Error> for Error {
                 Self::BufferTooSmall { expected, found }
             }
         }
+    }
+}
+
+impl From<fmt::Error> for Error {
+    fn from(_: fmt::Error) -> Self {
+        Self::Unexpected
     }
 }

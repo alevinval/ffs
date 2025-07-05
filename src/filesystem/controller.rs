@@ -109,6 +109,8 @@ where
 
     #[cfg(feature = "std")]
     pub fn print_tree(&mut self) -> Result<(), Error> {
-        self.directory.print_tree(&mut self.device)
+        use crate::io::StdoutFmtWriter;
+
+        self.directory.print_tree(&mut self.device, &mut StdoutFmtWriter)
     }
 }
