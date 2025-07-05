@@ -69,8 +69,12 @@ impl TreeNode {
         self.entries.iter_mut().enumerate().find(|(_, entry)| !entry.is_set())
     }
 
-    pub fn iter_set(&self) -> impl Iterator<Item = &Entry> {
+    pub fn iter_entries(&self) -> impl Iterator<Item = &Entry> {
         self.filter(|entry| entry.is_set())
+    }
+
+    pub fn iter_entries_mut(&mut self) -> impl Iterator<Item = &mut Entry> {
+        self.entries.iter_mut().filter(|entry| entry.is_set())
     }
 
     fn filter<P>(&self, predicate: P) -> impl Iterator<Item = &Entry>
@@ -146,23 +150,9 @@ impl Deserializable<Self> for TreeNode {
 #[cfg(test)]
 mod test {
 
-    use crate::io::{Reader, Writer};
+    use crate::test_serde_symmetry;
 
     use super::*;
 
-    #[test]
-    fn serde_symmetry() {
-        assert_eq!(3, TreeNode::SERDE_BLOCK_COUNT);
-
-        let expected = TreeNode::new();
-        let mut buffer = [0u8; Block::LEN * TreeNode::SERDE_BLOCK_COUNT];
-        let mut writer = Writer::new(&mut buffer);
-        let n = expected.serialize(&mut writer).unwrap();
-        assert_eq!(TreeNode::SERDE_LEN, n);
-
-        let mut reader = Reader::new(&buffer);
-        let actual = TreeNode::deserialize(&mut reader).unwrap();
-
-        assert_eq!(expected, actual);
-    }
+    test_serde_symmetry!(TreeNode, TreeNode::new());
 }

@@ -42,11 +42,25 @@ impl Tree {
         get_file(device, file_path, 0)
     }
 
+    pub fn prune<D>(&mut self, device: &mut D, addr: Addr) -> Result<bool, Error>
+    where
+        D: BlockDevice,
+    {
+        prune(device, &mut self.allocator, addr)
+    }
+
     pub fn count_files<D>(&self, device: &mut D) -> Result<usize, Error>
     where
         D: BlockDevice,
     {
         count_files(device, 0)
+    }
+
+    pub fn count_dirs<D>(&self, device: &mut D) -> Result<usize, Error>
+    where
+        D: BlockDevice,
+    {
+        count_dirs(device, 0)
     }
 
     #[cfg(feature = "std")]
@@ -135,6 +149,38 @@ fn insert_file<D: BlockDevice>(
     insert_file(device, allocator, next_path, next_addr)
 }
 
+fn prune<D: BlockDevice>(
+    device: &mut D,
+    allocator: &mut Allocator,
+    addr: Addr,
+) -> Result<bool, Error> {
+    let mut current = TreeNode::load(device, addr)?;
+    if current.is_leaf() {
+        if current.iter_entries().count() == 0 {
+            allocator.release(device, addr)?;
+            return Ok(true);
+        } else {
+            return Ok(false);
+        }
+    }
+
+    for entry in current.iter_entries_mut() {
+        if let Ok(pruned) = prune(device, allocator, entry.addr())
+            && pruned
+        {
+            *entry = Entry::empty();
+        }
+    }
+    current.store(device, addr)?;
+
+    if addr != 0 && current.iter_entries().count() == 0 {
+        allocator.release(device, addr)?;
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
+
 #[cfg(feature = "std")]
 fn print_tree_inner<D: BlockDevice>(
     device: &mut D,
@@ -153,11 +199,11 @@ fn print_tree_inner<D: BlockDevice>(
     }
 
     if current_node.is_leaf() {
-        for entry in current_node.iter_set() {
+        for entry in current_node.iter_entries() {
             println!("{}{}", "  ".repeat(depth + 2), entry.name().as_str());
         }
     } else {
-        for entry in current_node.iter_set() {
+        for entry in current_node.iter_entries() {
             println!("{}{}/", "  ".repeat(depth + 1), entry.name().as_str());
             print_tree_inner(device, entry.addr(), depth + 1, max_depth)?
         }
@@ -172,12 +218,67 @@ where
 {
     let current_node = TreeNode::load(device, addr)?;
     if current_node.is_leaf() {
-        Ok(current_node.iter_set().count())
+        Ok(current_node.iter_entries().count())
     } else {
         let mut count = 0;
-        for dir_ref in current_node.iter_set() {
+        for dir_ref in current_node.iter_entries() {
             count += count_files(device, dir_ref.addr())?;
         }
         Ok(count)
+    }
+}
+
+fn count_dirs<D>(device: &mut D, addr: Addr) -> Result<usize, Error>
+where
+    D: BlockDevice,
+{
+    let current_node = TreeNode::load(device, addr)?;
+    if current_node.is_leaf() {
+        return Ok(1);
+    }
+    let mut count = 1;
+    for entry in current_node.iter_entries() {
+        count += count_dirs(device, entry.addr())?;
+    }
+    Ok(count)
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{disk::MemoryDisk, filesystem::layout::Layout};
+
+    use super::*;
+
+    #[test]
+    fn multiple_tree_ops() {
+        let mut device = MemoryDisk::new(512, 10000);
+        let mut allocator = Allocator::new(Layout::new(0, 100));
+        TreeNode::new().store(&mut device, 0).unwrap();
+        assert_eq!(Ok(0), allocator.allocate(&mut device));
+
+        let mut tree = Tree::new(allocator);
+        println!("tree before insertion:");
+        tree.print_tree(&mut device).unwrap();
+        assert_eq!(1, tree.count_dirs(&mut device).unwrap());
+
+        let _ = tree.insert_file(&mut device, "dir/second/third/file.txt").unwrap();
+        println!("tree after insertion:");
+        tree.print_tree(&mut device).unwrap();
+        assert_eq!(4, tree.count_dirs(&mut device).unwrap());
+
+        let _ = tree.get_file(&mut device, "dir/second/third/file.txt").unwrap();
+        println!("tree after removal:");
+        tree.print_tree(&mut device).unwrap();
+
+        tree.remove_file(&mut device, "/dir/second/third/file.txt").unwrap();
+        assert_eq!(
+            Error::FileNotFound,
+            tree.get_file(&mut device, "/dir/second/third/file.txt").unwrap_err()
+        );
+
+        assert_eq!(Ok(false), tree.prune(&mut device, 0));
+        println!("tree after prune:");
+        tree.print_tree(&mut device).unwrap();
+        assert_eq!(1, tree.count_dirs(&mut device).unwrap());
     }
 }
