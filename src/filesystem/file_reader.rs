@@ -1,6 +1,7 @@
 use crate::{
     BlockDevice, Error,
     filesystem::{block::Block, cache::BlockCache, layout::Layout, node::Node},
+    io::Writer,
 };
 
 pub struct FileReader<'dev, D>
@@ -32,17 +33,16 @@ where
         }
 
         let mut block = Block::new();
-        let mut from = 0;
+        let mut writer = Writer::new(out);
         let blocks_needed = self.node.file_len().div_ceil(Block::LEN as u16) as usize;
         for (i, data_addr) in self.node.data_addrs().iter().take(blocks_needed).enumerate() {
             let sector = Layout::DATA.nth(*data_addr);
             self.device.read(sector, &mut block)?;
             if i == blocks_needed - 1 {
                 let remaining_bytes = self.node.file_len() as usize % Block::LEN;
-                out[from..from + remaining_bytes].copy_from_slice(&block[..remaining_bytes]);
+                writer.write(&block[..remaining_bytes])?;
             } else {
-                out[from..from + Block::LEN].copy_from_slice(&block);
-                from += Block::LEN;
+                writer.write(&block)?;
             }
         }
         Ok(self.node.file_len() as usize)
