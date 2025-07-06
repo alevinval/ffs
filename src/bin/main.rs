@@ -1,11 +1,11 @@
 use ffs::{BlockDevice, Controller, disk::MemoryDisk};
 
-fn ls_tree<D>(ctrl: &mut Controller<D>)
+fn ls_tree<D>(ctrl: &mut Controller<D>, base_path: &str)
 where
     D: BlockDevice,
 {
     println!("[listing tree]");
-    ctrl.print_tree().unwrap();
+    ctrl.print_tree(base_path).unwrap();
     println!()
 }
 
@@ -68,7 +68,7 @@ Ligula congue sollicitudin erat viverra ac tincidunt nam. Euismod quam justo lec
     println!("Controller initialized");
 
     ls_stats(&mut ctrl);
-    ls_tree(&mut ctrl);
+    ls_tree(&mut ctrl, "");
 
     println!("Creating file...");
     let fname = "hello/world/lorem_ipsum8.txt";
@@ -88,9 +88,9 @@ Ligula congue sollicitudin erat viverra ac tincidunt nam. Euismod quam justo lec
     println!("Contents: {}", str::from_utf8(&buf[..fd.file_len() as usize]).unwrap());
 
     ls_stats(&mut ctrl);
-    ls_tree(&mut ctrl);
+    ls_tree(&mut ctrl, "");
     rm_file(&mut ctrl, fname);
-    ls_tree(&mut ctrl);
+    ls_tree(&mut ctrl, "");
 
     let sdcard = ctrl.unmount();
     sdcard.persist_to_file("sdcard.img").expect("Failed to persist SD card image");

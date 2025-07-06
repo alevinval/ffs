@@ -119,7 +119,7 @@ where
     }
 
     #[cfg(feature = "std")]
-    pub fn print_tree(&mut self) -> Result<(), Error> {
-        self.directory.print_tree_stdout(&mut self.device)
+    pub fn print_tree(&mut self, base_path: &str) -> Result<(), Error> {
+        self.directory.print_tree_stdout(&mut self.device, base_path)
     }
 }
