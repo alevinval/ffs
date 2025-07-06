@@ -161,7 +161,7 @@ impl DataAllocator for Allocator {
         device: &mut D,
         node: &Node,
     ) -> Result<(), Error> {
-        for addr in node.block_addrs() {
+        for addr in node.data_addrs() {
             self.release(device, *addr)?;
         }
         Ok(())
@@ -271,15 +271,15 @@ mod test {
         let (mut device, mut sut) = get_sut();
 
         let node = sut.allocate_node_data(&mut device, 1).unwrap();
-        assert_eq!([0, 0, 0, 0, 0, 0, 0, 0, 0, 0], node.block_addrs());
+        assert_eq!([0, 0, 0, 0, 0, 0, 0, 0, 0, 0], node.data_addrs());
 
         let node = sut.allocate_node_data(&mut device, 128).unwrap();
-        assert_eq!([1, 0, 0, 0, 0, 0, 0, 0, 0, 0], node.block_addrs());
+        assert_eq!([1, 0, 0, 0, 0, 0, 0, 0, 0, 0], node.data_addrs());
 
         let node = sut.allocate_node_data(&mut device, 512).unwrap();
-        assert_eq!([2, 0, 0, 0, 0, 0, 0, 0, 0, 0], node.block_addrs());
+        assert_eq!([2, 0, 0, 0, 0, 0, 0, 0, 0, 0], node.data_addrs());
 
         let node = sut.allocate_node_data(&mut device, 1500).unwrap();
-        assert_eq!([3, 4, 5, 0, 0, 0, 0, 0, 0, 0], node.block_addrs());
+        assert_eq!([3, 4, 5, 0, 0, 0, 0, 0, 0, 0], node.data_addrs());
     }
 }

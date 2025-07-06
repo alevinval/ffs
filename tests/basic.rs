@@ -44,8 +44,8 @@ fn create_then_delete_file() {
         assert_eq!(Ok(0), ctrl.count_files());
     });
 
-    assert_eq!(52, device.reads_count);
-    assert_eq!(41, device.writes_count)
+    assert_eq!(51, device.reads_count);
+    assert_eq!(49, device.writes_count)
 }
 
 #[test]
@@ -124,6 +124,20 @@ fn delete_file_that_does_not_exist() {
 
     assert_eq!(5, device.reads_count);
     assert_eq!(5, device.writes_count);
+}
+
+#[test]
+fn create_file_and_read_content() {
+    let device = mounting(device(), |ctrl| {
+        assert_eq!(Ok(()), ctrl.create(FILE_PATH, DATA_FIXTURE));
+        let mut reader = ctrl.open(FILE_PATH).expect("should open file");
+        let mut buf = vec![0; DATA_FIXTURE.len()];
+        assert_eq!(DATA_FIXTURE.len(), reader.read(&mut buf).expect("should read data"));
+        assert_eq!(DATA_FIXTURE, &buf);
+    });
+
+    assert_eq!(24, device.reads_count);
+    assert_eq!(26, device.writes_count);
 }
 
 fn device() -> MemoryDisk {

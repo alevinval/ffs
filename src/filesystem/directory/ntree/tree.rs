@@ -59,7 +59,7 @@ impl Tree {
             }
             Ok(())
         };
-        visit_tree(device, 0, &mut count_files, 0)?;
+        visit_all_tree(device, 0, &mut count_files, 0)?;
         Ok(count)
     }
 
@@ -74,7 +74,7 @@ impl Tree {
             }
             Ok(())
         };
-        visit_tree(device, 0, &mut count_dirs, 0)?;
+        visit_all_tree(device, 0, &mut count_dirs, 0)?;
         Ok(count)
     }
 
@@ -106,7 +106,7 @@ impl Tree {
             }
             Ok(())
         };
-        visit_tree(device, 0, &mut visitor, 0)?;
+        visit_all_tree(device, 0, &mut visitor, 0)?;
         Ok(())
     }
 
@@ -233,7 +233,7 @@ fn prune<D: BlockDevice>(
     }
 }
 
-fn visit_tree<V, D: BlockDevice>(
+fn visit_all_tree<V, D: BlockDevice>(
     device: &mut D,
     addr: Addr,
     visitor: &mut V,
@@ -244,13 +244,11 @@ where
 {
     let current_node = TreeNode::load(device, addr)?;
     visitor(&current_node, depth)?;
-
     if !current_node.is_leaf() {
         for entry in current_node.iter_entries() {
-            visit_tree(device, entry.addr(), visitor, depth + 1)?;
+            visit_all_tree(device, entry.addr(), visitor, depth + 1)?;
         }
     }
-
     Ok(())
 }
 

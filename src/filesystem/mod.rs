@@ -1,6 +1,8 @@
 pub use controller::Controller;
 pub use directory::DirectoryNode;
+pub use file_reader::FileReader;
 pub use name::Name;
+pub use node::Node;
 
 use crate::{
     Error,
@@ -8,7 +10,6 @@ use crate::{
 };
 use block::Block;
 use layout::Layout;
-use node::Node;
 
 pub mod allocator;
 mod block;
@@ -17,6 +18,7 @@ mod controller;
 mod data_writer;
 mod directory;
 mod file;
+mod file_reader;
 mod handle;
 mod layout;
 mod meta;

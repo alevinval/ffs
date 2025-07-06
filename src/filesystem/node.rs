@@ -7,7 +7,7 @@ use crate::{
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct Node {
     file_len: u16,
-    block_addrs: [Addr; Node::BLOCKS_PER_NODE],
+    data_addrs: [Addr; Node::BLOCKS_PER_NODE],
 }
 
 impl Node {
@@ -18,12 +18,16 @@ impl Node {
     /// The maximum file size (in bytes) that a single node can represent.
     pub const MAX_FILE_SIZE: usize = Self::BLOCKS_PER_NODE * Block::LEN;
 
-    pub const fn new(file_size: u16, block_addrs: [Addr; Self::BLOCKS_PER_NODE]) -> Self {
-        Self { file_len: file_size, block_addrs }
+    pub const fn new(file_size: u16, data_addrs: [Addr; Self::BLOCKS_PER_NODE]) -> Self {
+        Self { file_len: file_size, data_addrs }
     }
 
-    pub const fn block_addrs(&self) -> &[Addr] {
-        &self.block_addrs
+    pub const fn data_addrs(&self) -> &[Addr] {
+        &self.data_addrs
+    }
+
+    pub const fn file_len(&self) -> u16 {
+        self.file_len
     }
 }
 
@@ -40,7 +44,7 @@ impl Addressable for Node {
 impl Serializable for Node {
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<usize, Error> {
         let mut n = writer.write_u16(self.file_len)?;
-        for addr in self.block_addrs() {
+        for addr in self.data_addrs() {
             n += writer.write_addr(*addr)?;
         }
         Ok(n)
@@ -54,7 +58,7 @@ impl Deserializable<Self> for Node {
         for addr in block_addrs.iter_mut() {
             *addr = reader.read_addr()?;
         }
-        Ok(Self { file_len, block_addrs })
+        Ok(Self { file_len, data_addrs: block_addrs })
     }
 }
 

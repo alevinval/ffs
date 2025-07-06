@@ -7,6 +7,7 @@ use crate::{
         data_writer::DataWriter,
         directory::{Directory, DirectoryNode},
         file::File,
+        file_reader::FileReader,
         meta::Meta,
         node::Node,
         node_writer::NodeWriter,
@@ -63,7 +64,7 @@ where
         let entry = self.directory.insert_file(&mut self.device, file_path)?;
         let file = File::new(*entry.name(), entry.addr());
         let node = self.allocator.allocate_node_data(&mut self.device, file_size)?;
-        DataWriter::new(node.block_addrs(), data).store(&mut self.device)?;
+        DataWriter::new(node.data_addrs(), data).store(&mut self.device)?;
         NodeWriter::new(file.node_addr(), &node).store(&mut self.device)?;
         file.store(&mut self.device)?;
         Ok(())
@@ -79,10 +80,20 @@ where
         node_handle.erase_from(&mut self.device)?;
         file_handle.erase_from(&mut self.device)?;
         self.directory.remove_file(&mut self.device, file_path)?;
+        self.directory.prune(&mut self.device, 0)?;
 
         // Release data blocks only after metadata is fully erased.
         self.allocator.release_node_data(&mut self.device, &node)?;
         Ok(())
+    }
+
+    pub fn open(&mut self, file_path: &str) -> Result<FileReader<D>, Error> {
+        path::validate(file_path)?;
+
+        let entry = self.directory.get_file(&mut self.device, file_path)?;
+        let (_, node_handle) = entry.get_handles();
+        let node = node_handle.load_from(&mut self.device)?;
+        Ok(FileReader::new(&mut self.device, node))
     }
 
     pub fn count_files(&mut self) -> Result<usize, Error> {
@@ -109,8 +120,6 @@ where
 
     #[cfg(feature = "std")]
     pub fn print_tree(&mut self) -> Result<(), Error> {
-        use crate::io::StdoutFmtWriter;
-
-        self.directory.print_tree(&mut self.device, &mut StdoutFmtWriter)
+        self.directory.print_tree_stdout(&mut self.device)
     }
 }

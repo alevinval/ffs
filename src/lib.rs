@@ -8,9 +8,9 @@ pub(crate) mod test_utils;
 
 use core::fmt;
 
-pub use filesystem::{BlockDevice, Controller};
+pub use filesystem::{BlockDevice, Controller, FileReader};
 
-use crate::filesystem::{DirectoryNode, Name};
+use crate::filesystem::{DirectoryNode, Name, Node};
 
 #[cfg(feature = "test-support")]
 pub mod disk;
@@ -21,6 +21,7 @@ mod io;
 pub struct Constants {}
 
 impl Constants {
+    pub const MAX_FILE_SIZE: usize = Node::MAX_FILE_SIZE;
     pub const FILENAME_LEN: usize = Name::LEN;
     pub const DIR_NODE_ENTRIES: usize = DirectoryNode::LEN;
 }

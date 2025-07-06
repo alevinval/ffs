@@ -80,6 +80,13 @@ Ligula congue sollicitudin erat viverra ac tincidunt nam. Euismod quam justo lec
     let _ = ctrl.create("/var/log/four.txt", data);
     let _ = ctrl.create("/mnt/boot/dev", data);
 
+    println!("Reading file contents...");
+    let mut fd = ctrl.open(fname).expect("failed to open file");
+    let mut buf = [0u8; ffs::Constants::MAX_FILE_SIZE];
+    fd.read(&mut buf).expect("failed to read file");
+    println!("Read {} bytes from {fname}", fd.file_len());
+    println!("Contents: {}", str::from_utf8(&buf[..fd.file_len() as usize]).unwrap());
+
     ls_stats(&mut ctrl);
     ls_tree(&mut ctrl);
     rm_file(&mut ctrl, fname);
