@@ -4,7 +4,7 @@ use crate::{
         Addr, Deserializable, Layout, Name, SerdeLen, Serializable,
         block::Block,
         directory::{
-            entry::Entry,
+            entry::{Entry, EntryKind},
             search::{binary_search, binary_search_mut},
         },
     },
@@ -14,23 +14,22 @@ use crate::{
 #[derive(Debug, PartialEq, Eq)]
 pub struct TreeNode {
     is_leaf: bool,
-    is_empty: bool,
     entries: [Entry; Self::LEN],
 }
 
 impl TreeNode {
     const LAYOUT: Layout = Layout::TREE;
 
-    pub const LEN: usize = 29;
+    pub const LEN: usize = 28;
 
     pub const fn new() -> Self {
         let entries = [const { Entry::empty() }; Self::LEN];
-        Self { is_empty: false, is_leaf: false, entries }
+        Self { is_leaf: false, entries }
     }
 
     pub(super) const fn new_leaf() -> Self {
         let entries = [const { Entry::empty() }; Self::LEN];
-        Self { is_empty: false, is_leaf: true, entries }
+        Self { is_leaf: true, entries }
     }
 
     pub const fn is_leaf(&self) -> bool {
@@ -41,7 +40,7 @@ impl TreeNode {
         assert!(!self.is_leaf, "Cannot insert node into a leaf node");
         let (_, entry) = self.find_unset().ok_or(Error::StorageFull)?;
         let name = Name::new(name)?;
-        let value = Entry::new(name, addr);
+        let value = Entry::new(name, addr, EntryKind::Dir);
         *entry = value.clone();
         self.entries.sort_by(|a, b| a.name().as_str().cmp(b.name().as_str()));
         Ok(value)
@@ -51,7 +50,7 @@ impl TreeNode {
         assert!(self.is_leaf, "Cannot insert file into a non-leaf node");
         let (pos, entry) = self.find_unset().ok_or(Error::StorageFull)?;
         let name = Name::new(name)?;
-        let value = Entry::new(name, addr * Self::LEN as Addr + pos as Addr);
+        let value = Entry::new(name, addr * Self::LEN as Addr + pos as Addr, EntryKind::File);
         *entry = value.clone();
         self.entries.sort_by(|a, b| a.name().as_str().cmp(b.name().as_str()));
         Ok(value)
@@ -119,9 +118,6 @@ impl SerdeLen for TreeNode {
 impl Serializable for TreeNode {
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<usize, Error> {
         let mut bitmap = 0u8;
-        if !self.is_empty {
-            bitmap |= 0b1;
-        }
         if self.is_leaf {
             bitmap |= 0b1 << 1;
         }
@@ -136,7 +132,6 @@ impl Serializable for TreeNode {
 impl Deserializable<Self> for TreeNode {
     fn deserialize<R: Read>(reader: &mut R) -> Result<Self, Error> {
         let bitmap = reader.read_u8()?;
-        let is_empty = bitmap & 0b1 == 0;
         let is_leaf = bitmap & (0b10) == 2;
 
         let mut entries = [const { Entry::empty() }; Self::LEN];
@@ -144,7 +139,7 @@ impl Deserializable<Self> for TreeNode {
             *entry = Entry::deserialize(reader)?;
         }
 
-        Ok(Self { is_empty, is_leaf, entries })
+        Ok(Self { is_leaf, entries })
     }
 }
 #[cfg(test)]

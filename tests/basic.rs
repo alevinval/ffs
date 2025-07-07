@@ -95,8 +95,8 @@ fn create_max_files() {
         }
     });
 
-    assert_eq!(10288, device.reads_count);
-    assert_eq!(7446, device.writes_count);
+    assert_eq!(10289, device.reads_count);
+    assert_eq!(7453, device.writes_count);
 }
 
 #[test]
