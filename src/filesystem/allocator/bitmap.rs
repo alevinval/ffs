@@ -6,18 +6,18 @@ use crate::{
 
 /// Tracks the free status of an address space, represented as a bitmap.
 #[derive(PartialEq, Eq, Debug)]
-pub struct AllocationBitmap {
+pub struct Bitmap {
     inner: Block,
     last_free: usize,
 }
 
-impl Default for AllocationBitmap {
+impl Default for Bitmap {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl AllocationBitmap {
+impl Bitmap {
     /// The number of addresses that can be tracked by a single [`AllocationBitmap`] instance.
     ///
     /// Each [`Block`] contains [`Block::LEN`] bytes, each bit in the byte represents
@@ -74,11 +74,11 @@ impl AllocationBitmap {
     }
 }
 
-impl SerdeLen for AllocationBitmap {
+impl SerdeLen for Bitmap {
     const SERDE_LEN: usize = Block::LEN;
 }
 
-impl Serializable for AllocationBitmap {
+impl Serializable for Bitmap {
     /// Serializes the [`Free`] instance into the provided byte slice.
     ///
     /// This copies the internal block state [`Self::inner`] into the first `[Block::LEN]` bytes of `out`.
@@ -92,7 +92,7 @@ impl Serializable for AllocationBitmap {
     }
 }
 
-impl Deserializable<Self> for AllocationBitmap {
+impl Deserializable<Self> for Bitmap {
     /// Deserializes a [`Free`] instance from the given byte slice.
     ///
     /// This method copies the first [`Block::LEN`] bytes of `buf` into `[Self::inner]`
@@ -114,7 +114,7 @@ mod test {
 
     use super::*;
 
-    fn take_nth_blocks(sut: &mut AllocationBitmap, n: usize) -> Option<Addr> {
+    fn take_nth_blocks(sut: &mut Bitmap, n: usize) -> Option<Addr> {
         let mut last = None;
         for _ in 0..n {
             last = sut.allocate();
@@ -122,15 +122,24 @@ mod test {
         last
     }
 
+    fn get_full_bitmap() -> Bitmap {
+        let mut bitmap = Bitmap::new();
+        take_nth_blocks(&mut bitmap, 2048);
+        bitmap.last_free = 0;
+        bitmap
+    }
+
+    test_serde_symmetry!(Bitmap, get_full_bitmap());
+
     #[test]
-    fn count_free_addresses() {
-        let sut = AllocationBitmap::new();
+    fn test_count_free_addresses() {
+        let sut = Bitmap::new();
         assert_eq!(4096, sut.count_free_addresses())
     }
 
     #[test]
-    fn take() {
-        let mut sut = AllocationBitmap::new();
+    fn test_allocate() {
+        let mut sut = Bitmap::new();
         assert_eq!(Some(0), sut.allocate());
         assert_eq!(Some(1), sut.allocate());
         assert_eq!(Some(2), sut.allocate());
@@ -139,8 +148,8 @@ mod test {
     }
 
     #[test]
-    fn release() {
-        let mut sut = AllocationBitmap::new();
+    fn test_allocate_then_release() {
+        let mut sut = Bitmap::new();
         assert_eq!(Some(4095), take_nth_blocks(&mut sut, 4096));
         assert_eq!(0, sut.count_free_addresses());
 
@@ -154,13 +163,4 @@ mod test {
         assert_eq!(2, sut.count_free_addresses());
         assert_eq!(Some(600), sut.allocate());
     }
-
-    fn get_full_bitmap() -> AllocationBitmap {
-        let mut bitmap = AllocationBitmap::new();
-        take_nth_blocks(&mut bitmap, 2048);
-        bitmap.last_free = 0;
-        bitmap
-    }
-
-    test_serde_symmetry!(AllocationBitmap, get_full_bitmap());
 }

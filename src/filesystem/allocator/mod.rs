@@ -1,10 +1,8 @@
 use crate::{
     BlockDevice, Error,
-    filesystem::{
-        Addr, Block, Deserializable, Serializable, allocator::bitmap::AllocationBitmap,
-        layout::Layout, node::Node,
-    },
+    filesystem::{Addr, Block, Deserializable, Serializable, layout::Layout, node::Node},
 };
+pub use bitmap::Bitmap;
 
 mod bitmap;
 
@@ -15,18 +13,17 @@ pub struct Allocator {
 }
 
 impl Allocator {
-    pub const SLOTS: usize = AllocationBitmap::SLOTS;
-
     pub const fn new(layout: Layout) -> Self {
-        Self { last_accessed: 0, layout }
+        Self { layout, last_accessed: 0 }
     }
 
+    /// Counts the number of free addresses, counts each bitmap of the layout.
     pub fn count_free_addresses<D: BlockDevice>(&self, device: &mut D) -> Result<usize, Error> {
-        let mut block = Block::new();
         let mut total = 0;
+        let mut block = Block::new();
         for sector in self.layout.iter_sectors() {
             device.read(sector, &mut block)?;
-            let bitmap = AllocationBitmap::deserialize(&mut block.reader())?;
+            let bitmap = Bitmap::deserialize(&mut block.reader())?;
             total += bitmap.count_free_addresses();
         }
         Ok(total)
@@ -86,7 +83,7 @@ impl Allocator {
 
         for (addr, sector) in self.layout.circular_iter(self.last_accessed) {
             device.read(sector, &mut block)?;
-            let mut bitmap = AllocationBitmap::deserialize(&mut block.reader())?;
+            let mut bitmap = Bitmap::deserialize(&mut block.reader())?;
 
             if let Some(allocation) = bitmap.allocate() {
                 bitmap.serialize(&mut block.writer())?;
@@ -114,7 +111,7 @@ impl Allocator {
         let mut block = Block::new();
         device.read(bitmap_sector, &mut block)?;
 
-        let mut bitmap = AllocationBitmap::deserialize(&mut block.reader())?;
+        let mut bitmap = Bitmap::deserialize(&mut block.reader())?;
         bitmap.release(bitmap_offset);
         bitmap.serialize(&mut block.writer())?;
 
@@ -169,15 +166,15 @@ impl DataAllocator for Allocator {
 }
 
 const fn to_bitmap_offset(addr: Addr) -> Addr {
-    addr % AllocationBitmap::SLOTS as Addr
+    addr % Bitmap::SLOTS as Addr
 }
 
 const fn to_bitmap_addr(addr: Addr) -> Addr {
-    addr / AllocationBitmap::SLOTS as Addr
+    addr / Bitmap::SLOTS as Addr
 }
 
 const fn to_addr(bitmap_addr: Addr, allocated_addr: Addr) -> Addr {
-    bitmap_addr * AllocationBitmap::SLOTS as Addr + allocated_addr
+    bitmap_addr * Bitmap::SLOTS as Addr + allocated_addr
 }
 
 #[cfg(test)]

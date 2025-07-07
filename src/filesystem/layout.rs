@@ -1,11 +1,9 @@
-use crate::filesystem::{
-    Addr, SerdeLen, allocator::Allocator, directory::DirectoryNode, node::Node,
-};
+use crate::filesystem::{Addr, SerdeLen, allocator::Bitmap, directory::DirectoryNode, node::Node};
 
 const N_TREE: usize = 100;
 const N_FILE: usize = N_TREE * DirectoryNode::LEN;
 const N_DATA: usize = Node::BLOCKS_PER_NODE * N_FILE;
-const N_FREE: usize = N_DATA / Allocator::SLOTS;
+const N_FREE: usize = N_DATA / Bitmap::SLOTS;
 
 #[derive(Debug)]
 pub struct Layout {
@@ -63,6 +61,20 @@ impl Layout {
 
     pub const fn iter_sectors(&self) -> core::ops::Range<Addr> {
         self.begin..self.end
+    }
+
+    #[cfg(feature = "std")]
+    pub fn print_disk_layout() {
+        use std::println;
+        println!("Disk layout:");
+        println!("  Meta: {:?}", Self::META);
+        println!("  TreeBitmap: {:?}", Self::TREE_BITMAP);
+        println!("  Tree: {:?}", Self::TREE);
+        println!("  File: {:?}", Self::FILE);
+        println!("  Node: {:?}", Self::NODE);
+        println!("  DataBitmap: {:?}", Self::DATA_BITMAP);
+        println!("  Data: {:?}", Self::DATA);
+        println!();
     }
 }
 

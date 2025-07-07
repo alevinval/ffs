@@ -1,11 +1,11 @@
 use ffs::{BlockDevice, Controller, disk::MemoryDisk};
 
-fn ls_tree<D>(ctrl: &mut Controller<D>, base_path: &str)
+fn ls_tree<D>(ctrl: &mut Controller<D>, base_path: &str, depth: usize)
 where
     D: BlockDevice,
 {
-    println!("[listing tree]");
-    ctrl.print_tree(base_path).unwrap();
+    println!("> Listing tree at {base_path}");
+    ctrl.print_tree(base_path, depth).unwrap();
     println!()
 }
 
@@ -13,17 +13,20 @@ fn rm_file<D>(ctrl: &mut Controller<D>, fname: &str)
 where
     D: BlockDevice,
 {
-    println!("[deleting {fname}]");
+    println!("> Deleting {fname}");
     ctrl.delete(fname).expect("failed");
     println!()
 }
 
 fn ls_stats(ctrl: &mut Controller<impl BlockDevice>) {
     let file_count = ctrl.count_files().expect("failed to count files");
+    let dirs_count = ctrl.count_dirs().expect("failed to count free blocks");
     let free_blocks = ctrl.free_data_blocks().expect("failed to count free blocks");
-    println!("stats:");
-    println!("files: {file_count}");
-    println!("free blocks: {free_blocks}");
+    println!("> Stats:");
+    println!("  files: {file_count}");
+    println!("  dir_nodes: {dirs_count}");
+    println!("  free_blocks: {free_blocks}");
+    println!();
 }
 
 fn main() {
@@ -65,12 +68,12 @@ Ligula congue sollicitudin erat viverra ac tincidunt nam. Euismod quam justo lec
     let mut ctrl = Controller::mount(sdcard).expect("failed to read metadata");
     ctrl.print_disk_layout();
 
-    println!("Controller initialized");
+    println!("> Controller initialized");
 
     ls_stats(&mut ctrl);
-    ls_tree(&mut ctrl, "");
+    ls_tree(&mut ctrl, "", 0);
 
-    println!("Creating file...");
+    println!("> Creating file");
     let fname = "hello/world/lorem_ipsum8.txt";
     ctrl.create(fname, data).expect("failed to create file");
 
@@ -80,17 +83,19 @@ Ligula congue sollicitudin erat viverra ac tincidunt nam. Euismod quam justo lec
     let _ = ctrl.create("/var/log/four.txt", data);
     let _ = ctrl.create("/mnt/boot/dev", data);
 
-    println!("Reading file contents...");
+    println!("> Reading file contents");
     let mut fd = ctrl.open(fname).expect("failed to open file");
     let mut buf = [0u8; ffs::Constants::MAX_FILE_SIZE];
     fd.read(&mut buf).expect("failed to read file");
-    println!("Read {} bytes from {fname}", fd.file_len());
-    println!("Contents: {}", str::from_utf8(&buf[..fd.file_len() as usize]).unwrap());
+    println!("> Read {} bytes from {fname}", fd.file_len());
+    println!("> Contents:\n\n{}\n", str::from_utf8(&buf[..fd.file_len() as usize]).unwrap());
 
     ls_stats(&mut ctrl);
-    ls_tree(&mut ctrl, "");
+    ls_tree(&mut ctrl, "", 0);
     rm_file(&mut ctrl, fname);
-    ls_tree(&mut ctrl, "");
+    ls_tree(&mut ctrl, "", 0);
+    ls_tree(&mut ctrl, "var", 0);
+    ls_tree(&mut ctrl, "var", 1);
 
     let sdcard = ctrl.unmount();
     sdcard.persist_to_file("sdcard.img").expect("Failed to persist SD card image");

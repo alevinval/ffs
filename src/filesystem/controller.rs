@@ -5,7 +5,7 @@ use crate::{
         allocator::{Allocator, DataAllocator},
         cache::BlockCache,
         data_writer::DataWriter,
-        directory::{Directory, DirectoryNode},
+        directory::Directory,
         file::File,
         file_reader::FileReader,
         meta::Meta,
@@ -34,7 +34,7 @@ where
             return Err(Error::UnsupportedDevice);
         }
         let device = BlockCache::mount(device);
-        let directory = Directory::new(Allocator::new(Layout::TREE_BITMAP));
+        let directory = Directory::new(Layout::TREE_BITMAP);
         let allocator = Allocator::new(Layout::DATA_BITMAP);
         Ok(Self { device, directory, allocator })
     }
@@ -45,8 +45,7 @@ where
 
     pub fn format(device: &mut D) -> Result<(), Error> {
         Meta::new().store(device)?;
-        Allocator::new(Layout::TREE_BITMAP).allocate(device)?;
-        DirectoryNode::new().store(device, 0)?;
+        Directory::new(Layout::TREE_BITMAP).format(device)?;
         Ok(())
     }
 
@@ -100,26 +99,21 @@ where
         self.directory.count_files(&mut self.device)
     }
 
+    pub fn count_dirs(&mut self) -> Result<usize, Error> {
+        self.directory.count_dirs(&mut self.device)
+    }
+
     pub fn free_data_blocks(&mut self) -> Result<usize, Error> {
         self.allocator.count_free_addresses(&mut self.device)
     }
 
     #[cfg(feature = "std")]
-    pub fn print_disk_layout(&self) {
-        use std::println;
-
-        println!("Disk layout:");
-        println!("  Meta: {:?}", Layout::META);
-        println!("  Tree bitmap: {:?}", Layout::TREE_BITMAP);
-        println!("  Tree: {:?}", Layout::TREE);
-        println!("  File: {:?}", Layout::FILE);
-        println!("  Node: {:?}", Layout::NODE);
-        println!("  Data bitmap: {:?}", Layout::DATA_BITMAP);
-        println!("  Data: {:?}", Layout::DATA);
+    pub fn print_tree(&mut self, base_path: &str, depth: usize) -> Result<(), Error> {
+        self.directory.print_tree_stdout(&mut self.device, base_path, depth)
     }
 
     #[cfg(feature = "std")]
-    pub fn print_tree(&mut self, base_path: &str) -> Result<(), Error> {
-        self.directory.print_tree_stdout(&mut self.device, base_path)
+    pub fn print_disk_layout(&self) {
+        Layout::print_disk_layout();
     }
 }
