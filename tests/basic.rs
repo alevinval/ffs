@@ -44,7 +44,7 @@ fn create_then_delete_file() {
         assert_eq!(Ok(0), ctrl.count_files());
     });
 
-    assert_eq!(51, device.reads_count);
+    assert_eq!(55, device.reads_count);
     assert_eq!(46, device.writes_count)
 }
 

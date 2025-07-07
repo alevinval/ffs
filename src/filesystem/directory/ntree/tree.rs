@@ -46,14 +46,21 @@ impl Tree {
     where
         D: BlockDevice,
     {
-        remove_file(device, file_path, 0)
+        let (addr, mut current) = find_node(device, file_path, 0)?;
+        let basename = path::basename(file_path);
+        if let Some(entry) = current.find_mut(basename) {
+            *entry = Entry::empty();
+            current.store(device, addr)?;
+            return Ok(());
+        }
+        Err(Error::FileNotFound)
     }
 
     pub fn get_file<D>(&self, device: &mut D, file_path: &str) -> Result<Entry, Error>
     where
         D: BlockDevice,
     {
-        get_file(device, file_path, 0)
+        find_entry(device, file_path, 0)
     }
 
     pub fn prune<D>(&mut self, device: &mut D, addr: Addr) -> Result<bool, Error>
@@ -92,8 +99,8 @@ impl Tree {
         D: BlockDevice,
         W: fmt::Write,
     {
-        let start_addr = find_addr_for_path(device, base_path, 0)?;
-        print_tree_in_order(device, start_addr, depth, out)?;
+        let entry = find_entry(device, base_path, 0)?;
+        print_tree_in_order(device, entry.addr(), depth, out)?;
         Ok(())
     }
 
@@ -114,35 +121,6 @@ impl Tree {
         println!("{txt}");
         Ok(())
     }
-}
-
-fn remove_file<D: BlockDevice>(device: &mut D, file_path: &str, addr: Addr) -> Result<(), Error> {
-    let mut current = TreeNode::load(device, addr)?;
-    let basename = path::basename(file_path);
-    if let Some(entry) = current.find_mut(basename) {
-        *entry = Entry::empty();
-        current.store(device, addr)?;
-        return Ok(());
-    }
-    let first_component = path::first_component(file_path);
-    if let Some(entry) = current.find(first_component) {
-        let next_path = path::tail(file_path);
-        return remove_file(device, next_path, entry.addr());
-    }
-    Err(Error::FileNotFound)
-}
-
-fn get_file<D: BlockDevice>(device: &mut D, file_path: &str, addr: Addr) -> Result<Entry, Error> {
-    let current = TreeNode::load(device, addr)?;
-    if let Some(entry) = current.find(path::basename(file_path)) {
-        return Ok(entry.clone());
-    }
-    let first_component = path::first_component(file_path);
-    if let Some(dir_ref) = current.find(first_component) {
-        let next_path = path::tail(file_path);
-        return get_file(device, next_path, dir_ref.addr());
-    }
-    Err(Error::FileNotFound)
 }
 
 fn insert_file<D: BlockDevice>(
@@ -210,28 +188,6 @@ fn prune<D: BlockDevice>(
     Ok(false)
 }
 
-fn find_addr_for_path<D: BlockDevice>(
-    device: &mut D,
-    mut file_path: &str,
-    mut addr: Addr,
-) -> Result<Addr, Error> {
-    while !file_path.is_empty() {
-        let current = TreeNode::load(device, addr)?;
-        let first_component = path::first_component(file_path);
-        if let Some(entry) = current.find(first_component) {
-            let next_path = path::tail(file_path);
-            if next_path == file_path {
-                return Ok(entry.addr());
-            }
-            file_path = next_path;
-            addr = entry.addr();
-        } else {
-            return Err(Error::FileNotFound);
-        }
-    }
-    Ok(addr)
-}
-
 fn print_tree_in_order<D: BlockDevice, W: fmt::Write>(
     device: &mut D,
     addr: Addr,
@@ -256,6 +212,28 @@ fn print_tree_in_order<D: BlockDevice, W: fmt::Write>(
     Ok(())
 }
 
+fn find_node<D: BlockDevice>(
+    device: &mut D,
+    file_path: &str,
+    addr: Addr,
+) -> Result<(Addr, TreeNode), Error> {
+    let entry = find_entry(device, file_path, addr)?;
+    Ok((entry.addr(), TreeNode::load(device, entry.addr())?))
+}
+
+fn find_entry<D: BlockDevice>(device: &mut D, file_path: &str, addr: Addr) -> Result<Entry, Error> {
+    let current = TreeNode::load(device, addr)?;
+    let first_component = path::first_component(file_path);
+    if let Some(entry) = current.find(first_component) {
+        let next_path = path::tail(file_path);
+        if next_path == file_path {
+            return Ok(entry.clone());
+        }
+        return find_entry(device, next_path, entry.addr());
+    }
+    Err(Error::FileNotFound)
+}
+
 #[cfg(test)]
 mod test {
     use std::{println, string::String};
@@ -276,26 +254,23 @@ mod test {
     #[test]
     fn test_find_addr_for_path_root() {
         let (mut device, _) = get_sut();
-        assert_eq!(Ok(0), find_addr_for_path(&mut device, "", 0));
+        assert_eq!(Ok(0), find_entry(&mut device, "", 0).map(|e| e.addr()));
     }
 
     #[test]
     fn test_find_addr_for_path_missing() {
         let (mut device, _) = get_sut();
-        assert_eq!(
-            Err(Error::FileNotFound),
-            find_addr_for_path(&mut device, "missing/path/file.txt", 0)
-        );
+        assert_eq!(Err(Error::FileNotFound), find_entry(&mut device, "missing/path/file.txt", 0));
     }
 
     #[test]
     fn test_find_addr_for_path_found() {
         let (mut device, mut tree) = get_sut();
         tree.insert_file(&mut device, "some/path/file.txt").expect("cannot insert file");
-        assert_eq!(Ok(0), find_addr_for_path(&mut device, "", 0));
-        assert_eq!(Ok(1), find_addr_for_path(&mut device, "some", 0));
-        assert_eq!(Ok(2), find_addr_for_path(&mut device, "some/path", 0));
-        assert_eq!(Ok(2), find_addr_for_path(&mut device, "some/path/file.txt", 0));
+        assert_eq!(Ok(0), find_entry(&mut device, "", 0).map(|e| e.addr()));
+        assert_eq!(Ok(1), find_entry(&mut device, "some", 0).map(|e| e.addr()));
+        assert_eq!(Ok(2), find_entry(&mut device, "some/path", 0).map(|e| e.addr()));
+        assert_eq!(Ok(2), find_entry(&mut device, "some/path/file.txt", 0).map(|e| e.addr()));
     }
 
     #[test]
