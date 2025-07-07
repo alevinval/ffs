@@ -32,7 +32,7 @@ impl TreeNode {
     }
 
     pub fn insert(&mut self, name: &str, addr: Addr, kind: EntryKind) -> Result<Entry, Error> {
-        let (_, entry) = self.find_unset().ok_or(Error::StorageFull)?;
+        let (_, entry) = self.find_unset().ok_or(Error::DirectoryFull)?;
         let name = Name::new(name)?;
         let value = Entry::new(name, addr, kind);
         *entry = value.clone();
@@ -122,9 +122,26 @@ impl Deserializable<Self> for TreeNode {
 #[cfg(test)]
 mod test {
 
+    use std::format;
+
     use crate::test_serde_symmetry;
 
     use super::*;
 
     test_serde_symmetry!(TreeNode, TreeNode::new());
+
+    #[test]
+    fn test_insert_full_node() {
+        let mut sut = TreeNode::new();
+        for i in 0..=TreeNode::LEN {
+            let addr = Addr::from(i as u32);
+            let kind = if i % 2 == 0 { EntryKind::File } else { EntryKind::Dir };
+            sut.insert(&format!("entry-{i}"), addr, kind).expect("should insert entry");
+        }
+
+        assert_eq!(
+            Err(Error::DirectoryFull),
+            sut.insert("extra-entry", 100 as Addr, EntryKind::File)
+        );
+    }
 }
