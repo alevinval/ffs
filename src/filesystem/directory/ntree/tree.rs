@@ -5,7 +5,14 @@ use crate::{
     filesystem::{
         Addr,
         allocator::Allocator,
-        directory::{Entry, entry::EntryKind, ntree::TreeNode},
+        directory::{
+            Entry,
+            entry::EntryKind,
+            ntree::{
+                TreeNode,
+                visitors::{CounterVisitor, Visitor},
+            },
+        },
         layout::Layout,
         path,
     },
@@ -60,26 +67,18 @@ impl Tree {
     where
         D: BlockDevice,
     {
-        let mut count = 0;
-        let mut count_files = |node: &TreeNode, _depth: usize| {
-            count += node.iter_entries().filter(|entry| !entry.is_dir()).count();
-            Ok(())
-        };
-        visit_all_tree(device, 0, &mut count_files, 0)?;
-        Ok(count)
+        let mut counter = CounterVisitor::new(EntryKind::File);
+        counter.walk_tree(device, 0, 0)?;
+        Ok(counter.result())
     }
 
     pub fn count_dirs<D>(&self, device: &mut D) -> Result<usize, Error>
     where
         D: BlockDevice,
     {
-        let mut count = 0;
-        let mut count_dirs = |node: &TreeNode, _detph: usize| {
-            count += node.iter_entries().filter(|entry| entry.is_dir()).count();
-            Ok(())
-        };
-        visit_all_tree(device, 0, &mut count_dirs, 0)?;
-        Ok(count)
+        let mut counter = CounterVisitor::new(EntryKind::Dir);
+        counter.walk_tree(device, 0, 0)?;
+        Ok(counter.result())
     }
 
     pub fn print_tree<D, W>(
@@ -231,23 +230,6 @@ fn find_addr_for_path<D: BlockDevice>(
         }
     }
     Ok(addr)
-}
-
-fn visit_all_tree<V, D: BlockDevice>(
-    device: &mut D,
-    addr: Addr,
-    visitor: &mut V,
-    depth: usize,
-) -> Result<(), Error>
-where
-    V: FnMut(&TreeNode, usize) -> Result<(), Error>,
-{
-    let current_node = TreeNode::load(device, addr)?;
-    for entry in current_node.iter_entries().filter(|entry| entry.is_dir()) {
-        visit_all_tree(device, entry.addr(), visitor, depth + 1)?;
-    }
-    visitor(&current_node, depth)?;
-    Ok(())
 }
 
 fn print_tree_in_order<D: BlockDevice, W: fmt::Write>(

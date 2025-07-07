@@ -6,6 +6,7 @@ use crate::{
     },
     io::{Read, Write},
 };
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Entry {
     name: Name,
@@ -24,6 +25,10 @@ impl Entry {
 
     pub const fn is_dir(&self) -> bool {
         matches!(self.kind, EntryKind::Dir)
+    }
+
+    pub const fn kind(&self) -> EntryKind {
+        self.kind
     }
 
     pub const fn name(&self) -> &Name {
@@ -71,7 +76,7 @@ impl Deserializable<Self> for Entry {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum EntryKind {
     File,
     Dir,
