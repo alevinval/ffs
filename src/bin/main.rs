@@ -74,14 +74,14 @@ Ligula congue sollicitudin erat viverra ac tincidunt nam. Euismod quam justo lec
     ls_tree(&mut ctrl, "", 0);
 
     println!("> Creating file");
-    let fname = "hello/world/lorem_ipsum8.txt";
+    let fname = "dirA/dirB/lorem_ipsum8.txt";
     ctrl.create(fname, data).expect("failed to create file");
 
-    let _ = ctrl.create("/var/log/asd.txt", data);
-    let _ = ctrl.create("/var/log/two.txt", data);
-    let _ = ctrl.create("/var/log/three.txt", data);
-    let _ = ctrl.create("/var/log/four.txt", data);
-    let _ = ctrl.create("/mnt/boot/dev", data);
+    let _ = ctrl.create("/dirC/first/one.txt", data);
+    let _ = ctrl.create("/dirC/first/two.txt", data);
+    let _ = ctrl.create("/dirC/second/three.txt", data);
+    let _ = ctrl.create("/dirC/third/four.txt", data);
+    let _ = ctrl.create("/dirD/boot/dev", data);
 
     println!("> Reading file contents");
     let mut fd = ctrl.open(fname).expect("failed to open file");
@@ -94,8 +94,8 @@ Ligula congue sollicitudin erat viverra ac tincidunt nam. Euismod quam justo lec
     ls_tree(&mut ctrl, "", 0);
     rm_file(&mut ctrl, fname);
     ls_tree(&mut ctrl, "", 0);
-    ls_tree(&mut ctrl, "var", 0);
-    ls_tree(&mut ctrl, "var", 1);
+    ls_tree(&mut ctrl, "dirC", 0);
+    ls_tree(&mut ctrl, "dirC", 1);
 
     let sdcard = ctrl.unmount();
     sdcard.persist_to_file("sdcard.img").expect("Failed to persist SD card image");
