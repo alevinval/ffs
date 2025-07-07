@@ -19,7 +19,7 @@ pub struct TreeNode {
 impl TreeNode {
     const LAYOUT: Layout = Layout::TREE;
 
-    pub const LEN: usize = 28;
+    pub const LEN: usize = 30;
 
     pub const fn new() -> Self {
         let entries = [const { Entry::empty() }; Self::LEN];

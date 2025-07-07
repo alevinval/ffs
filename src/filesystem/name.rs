@@ -19,7 +19,7 @@ pub struct Name {
 
 impl Name {
     /// Maximum length of a file name in bytes.
-    pub const LEN: usize = 47;
+    pub const LEN: usize = 45;
 
     pub const fn empty() -> Self {
         Self { buffer: Self::buffer(), len: 0 }
