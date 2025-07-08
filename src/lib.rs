@@ -38,6 +38,8 @@ pub enum Error {
     FileNotFound,
     /// The file is too large to be stored.
     FileTooLarge,
+    /// The directory is not found.
+    DirectoryNotFound,
     /// The directory is full and cannot accommodate more entries.
     DirectoryFull,
     /// The file system is full and cannot accommodate more files.

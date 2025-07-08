@@ -3,15 +3,12 @@ use crate::{
     filesystem::{
         Addr, Deserializable, Layout, Name, SerdeLen, Serializable,
         block::Block,
-        directory::{
-            entry::{Entry, EntryKind},
-            search::{binary_search, binary_search_mut},
-        },
+        directory::entry::{Entry, EntryKind},
     },
     io::{Read, Reader, Write, Writer},
 };
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TreeNode {
     entries: [Entry; Self::LEN],
 }
@@ -40,12 +37,20 @@ impl TreeNode {
         Ok(value)
     }
 
-    pub fn find(&self, name: &str) -> Option<&Entry> {
-        binary_search(&self.entries, name, |entry| entry.name().as_str())
+    pub const fn get(&self, pos: usize) -> &Entry {
+        &self.entries[pos]
     }
 
-    pub fn find_mut(&mut self, name: &str) -> Option<&mut Entry> {
-        binary_search_mut(&mut self.entries, name, |entry| entry.name().as_str())
+    pub const fn get_mut(&mut self, pos: usize) -> &mut Entry {
+        &mut self.entries[pos]
+    }
+
+    pub fn find_index(&self, name: &str) -> Option<usize> {
+        binary_search_index(&self.entries, name, |entry| entry.name().as_str())
+    }
+
+    pub fn find(&self, name: &str) -> Option<&Entry> {
+        self.find_index(name).and_then(|idx| self.entries.get(idx))
     }
 
     pub fn find_unset(&mut self) -> Option<(usize, &mut Entry)> {
@@ -93,6 +98,23 @@ impl TreeNode {
         }
         Ok(())
     }
+}
+
+pub fn binary_search_index<T, K>(list: &[T], value: &K, get_key: impl Fn(&T) -> &K) -> Option<usize>
+where
+    K: Ord + ?Sized,
+{
+    let mut low = 0;
+    let mut high = list.len();
+    while low < high {
+        let mid = (low + high) / 2;
+        match get_key(&list[mid]).cmp(value) {
+            core::cmp::Ordering::Less => low = mid + 1,
+            core::cmp::Ordering::Equal => return Some(mid),
+            core::cmp::Ordering::Greater => high = mid,
+        }
+    }
+    None
 }
 
 impl SerdeLen for TreeNode {
