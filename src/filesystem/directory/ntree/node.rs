@@ -11,7 +11,7 @@ use crate::{
     io::{Read, Reader, Write, Writer},
 };
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TreeNode {
     entries: [Entry; Self::LEN],
 }

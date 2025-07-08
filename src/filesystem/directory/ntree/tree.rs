@@ -46,11 +46,11 @@ impl Tree {
     where
         D: BlockDevice,
     {
-        let (addr, mut current) = find_node(device, file_path, 0)?;
+        let (parent_addr, mut parent) = find_parent_for(device, file_path, 0)?;
         let basename = path::basename(file_path);
-        if let Some(entry) = current.find_mut(basename) {
+        if let Some(entry) = parent.find_mut(basename) {
             *entry = Entry::empty();
-            current.store(device, addr)?;
+            parent.store(device, parent_addr)?;
             return Ok(());
         }
         Err(Error::FileNotFound)
@@ -222,18 +222,39 @@ fn find_node<D: BlockDevice>(
     addr: Addr,
 ) -> Result<(Addr, TreeNode), Error> {
     let entry = find_entry(device, file_path, addr)?;
+    if !entry.is_dir() {
+        return Err(Error::DirectoryNotFound);
+    }
+    assert!(entry.is_dir(), "should always be directory entry");
     Ok((entry.addr(), TreeNode::load(device, entry.addr())?))
 }
 
+fn find_parent_for<D: BlockDevice>(
+    device: &mut D,
+    file_path: &str,
+    addr: Addr,
+) -> Result<(Addr, TreeNode), Error> {
+    find_file_path(device, file_path, addr)
+        .map(|(parent_addr, parent_node, _)| (parent_addr, parent_node))
+}
+
 fn find_entry<D: BlockDevice>(device: &mut D, file_path: &str, addr: Addr) -> Result<Entry, Error> {
+    find_file_path(device, file_path, addr).map(|(_, _, entry)| entry)
+}
+
+fn find_file_path<D: BlockDevice>(
+    device: &mut D,
+    file_path: &str,
+    addr: Addr,
+) -> Result<(Addr, TreeNode, Entry), Error> {
     let current = TreeNode::load(device, addr)?;
     let first_component = path::first_component(file_path);
     if let Some(entry) = current.find(first_component) {
         let next_path = path::tail(file_path);
         if next_path == file_path {
-            return Ok(entry.clone());
+            return Ok((addr, current.clone(), entry.clone()));
         }
-        return find_entry(device, next_path, entry.addr());
+        return find_file_path(device, next_path, entry.addr());
     }
     Err(Error::FileNotFound)
 }
@@ -372,5 +393,23 @@ mod test {
   file.txt
 ";
         assert_eq!(expected, &actual);
+    }
+
+    #[test]
+    fn test_print_file_fails() {
+        let (mut device, mut tree) = get_sut();
+
+        let mut actual = String::new();
+        assert_eq!(Ok(()), tree.print_tree(&mut device, "", 0, &mut actual));
+        assert_eq!("$/\n", &actual);
+
+        let _ = tree.insert_file(&mut device, "dir1/dir2/dir3/file.txt");
+        let _ = tree.insert_file(&mut device, "dir1/dir3/file.txt");
+        let _ = tree.insert_file(&mut device, "dir1/dir3/dir4/dir5/file.txt");
+        let _ = tree.insert_file(&mut device, "dir1/file.txt");
+
+        let mut out = String::new();
+        let result = tree.print_tree(&mut device, "dir1/file.txt", 0, &mut out);
+        assert_eq!(Err(Error::DirectoryNotFound), result)
     }
 }
