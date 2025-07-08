@@ -75,7 +75,7 @@ impl Tree {
         D: BlockDevice,
     {
         let mut counter = CounterVisitor::new(EntryKind::File);
-        counter.walk_tree(device, 0, 0)?;
+        counter.walk_from_root(device, 0)?;
         Ok(counter.result())
     }
 
@@ -84,7 +84,7 @@ impl Tree {
         D: BlockDevice,
     {
         let mut counter = CounterVisitor::new(EntryKind::Dir);
-        counter.walk_tree(device, 0, 0)?;
+        counter.walk_from_root(device, 0)?;
         Ok(counter.result())
     }
 
@@ -99,8 +99,8 @@ impl Tree {
         D: BlockDevice,
         W: fmt::Write,
     {
-        let entry = find_entry(device, base_path, 0)?;
-        print_tree_in_order(device, entry.addr(), depth, out)?;
+        let (addr, node) = find_node(device, base_path, 0)?;
+        print_tree_in_order(device, addr, &node, depth, 0, out)?;
         Ok(())
     }
 
@@ -191,20 +191,24 @@ fn prune<D: BlockDevice>(
 fn print_tree_in_order<D: BlockDevice, W: fmt::Write>(
     device: &mut D,
     addr: Addr,
+    node: &TreeNode,
+    max_depth: usize,
     depth: usize,
     out: &mut W,
 ) -> Result<(), Error> {
-    if depth == 0 {
+    if max_depth > 0 && depth >= max_depth {
+        return Ok(());
+    } else if depth == 0 {
         if addr == 0 {
             out.write_str("$/\n")?;
         } else {
             out.write_str("../\n")?;
         }
     }
-    let node = TreeNode::load(device, addr)?;
     for entry in node.iter_entries().filter(|entry| entry.is_dir()) {
         out.write_fmt(format_args!("{}{}/\n", "  ".repeat(depth + 1), entry.name().as_str()))?;
-        print_tree_in_order(device, entry.addr(), depth + 1, out)?;
+        let next_node = TreeNode::load(device, entry.addr())?;
+        print_tree_in_order(device, entry.addr(), &next_node, max_depth, depth + 1, out)?;
     }
     for entry in node.iter_entries().filter(|e| !e.is_dir()) {
         out.write_fmt(format_args!("{}{}\n", "  ".repeat(depth + 1), entry.name().as_str()))?;
@@ -238,14 +242,18 @@ fn find_entry<D: BlockDevice>(device: &mut D, file_path: &str, addr: Addr) -> Re
 mod test {
     use std::{println, string::String};
 
-    use crate::{disk::MemoryDisk, filesystem::layout::Layout};
+    use crate::{
+        disk::MemoryDisk,
+        filesystem::{SerdeLen, layout::Layout},
+    };
 
     use super::*;
 
-    const TEST_LAYOUT: Layout = Layout::new(0, 100);
+    const TEST_LAYOUT: Layout = Layout::new(0, 10);
 
     fn get_sut() -> (MemoryDisk, Tree) {
-        let mut device = MemoryDisk::new(512, 10000);
+        let mut device =
+            MemoryDisk::new(512, TEST_LAYOUT.entries_count() as usize * TreeNode::SERDE_LEN);
         let mut tree = Tree::new(TEST_LAYOUT);
         tree.format(&mut device).expect("failed to format device");
         (device, tree)
@@ -337,6 +345,31 @@ mod test {
         let expected = "../
   dir3/
     file.txt
+";
+        assert_eq!(expected, &actual);
+    }
+
+    #[test]
+    fn test_print_tree_relative_and_max_depth() {
+        let (mut device, mut tree) = get_sut();
+
+        let mut actual = String::new();
+        assert_eq!(Ok(()), tree.print_tree(&mut device, "", 0, &mut actual));
+        assert_eq!("$/\n", &actual);
+
+        let _ = tree.insert_file(&mut device, "dir1/dir2/dir3/file.txt");
+        let _ = tree.insert_file(&mut device, "dir1/dir3/file.txt");
+        let _ = tree.insert_file(&mut device, "dir1/dir3/dir4/dir5/file.txt");
+        let _ = tree.insert_file(&mut device, "dir1/file.txt");
+        let mut actual = String::new();
+        assert_eq!(Ok(()), tree.print_tree(&mut device, "dir1", 2, &mut actual));
+        let expected = "../
+  dir2/
+    dir3/
+  dir3/
+    dir4/
+    file.txt
+  file.txt
 ";
         assert_eq!(expected, &actual);
     }

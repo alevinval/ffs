@@ -19,6 +19,14 @@ pub trait Visitor {
         self.visit(&current_node, depth)?;
         Ok(())
     }
+
+    fn walk_from_root<D: BlockDevice>(
+        &mut self,
+        device: &mut D,
+        depth: usize,
+    ) -> Result<(), Error> {
+        self.walk_tree(device, 0, depth)
+    }
 }
 
 pub struct CounterVisitor {
