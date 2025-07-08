@@ -61,7 +61,7 @@ where
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use crate::{test_serde_symmetry, test_utils::MockDevice};
 
     use super::*;

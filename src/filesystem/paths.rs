@@ -28,7 +28,6 @@ pub fn tail(path: &str) -> &str {
     if dirname(path).is_empty() {
         return path;
     }
-
     let first = first_component(path);
     norm(path.strip_prefix(first).unwrap())
 }
@@ -38,12 +37,12 @@ pub fn first_component(path: &str) -> &str {
     path.split(SEPARATOR).next().unwrap_or("")
 }
 
-pub fn norm(path: &str) -> &str {
+fn norm(path: &str) -> &str {
     path.trim_start_matches(SEPARATOR).trim_end_matches(SEPARATOR)
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
 
     use super::*;
 

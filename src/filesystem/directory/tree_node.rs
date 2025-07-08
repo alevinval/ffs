@@ -100,7 +100,7 @@ impl TreeNode {
     }
 }
 
-pub fn binary_search_index<T, K>(list: &[T], value: &K, get_key: impl Fn(&T) -> &K) -> Option<usize>
+fn binary_search_index<T, K>(list: &[T], value: &K, get_key: impl Fn(&T) -> &K) -> Option<usize>
 where
     K: Ord + ?Sized,
 {
@@ -142,7 +142,7 @@ impl Deserializable<Self> for TreeNode {
     }
 }
 #[cfg(test)]
-mod test {
+mod tests {
 
     use std::format;
 

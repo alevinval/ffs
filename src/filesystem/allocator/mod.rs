@@ -178,7 +178,7 @@ const fn to_addr(bitmap_addr: Addr, allocated_addr: Addr) -> Addr {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use crate::disk::MemoryDisk;
 
     use super::*;

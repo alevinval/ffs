@@ -97,7 +97,7 @@ impl BlockDevice for MemoryDisk {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
 
     use super::*;
 

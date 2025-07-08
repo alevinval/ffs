@@ -1,6 +1,9 @@
 pub use entry::Entry;
-pub use ntree::Tree as Directory;
-pub use ntree::TreeNode as DirectoryNode;
+pub use tree::Tree;
+pub use tree_node::TreeNode;
 
 mod entry;
-mod ntree;
+mod tree;
+mod tree_node;
+pub mod tree_printer;
+mod visitors;

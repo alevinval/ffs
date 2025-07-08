@@ -109,7 +109,7 @@ impl Deserializable<Self> for EntryKind {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
 
     use crate::test_serde_symmetry;
 

@@ -70,7 +70,7 @@ impl core::fmt::Debug for Block {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
 
     #[test]

@@ -5,13 +5,13 @@ use crate::{
         allocator::{Allocator, DataAllocator},
         cache::BlockCache,
         data_writer::DataWriter,
-        directory::Directory,
+        directory::Tree,
         file::File,
         file_reader::FileReader,
         meta::Meta,
         node::Node,
         node_writer::NodeWriter,
-        path,
+        paths,
     },
 };
 
@@ -21,7 +21,7 @@ where
     D: BlockDevice,
 {
     device: BlockCache<D>,
-    directory: Directory,
+    directory: Tree,
     allocator: Allocator,
 }
 
@@ -34,7 +34,7 @@ where
             return Err(Error::UnsupportedDevice);
         }
         let device = BlockCache::mount(device);
-        let directory = Directory::new(Layout::TREE_BITMAP);
+        let directory = Tree::new(Layout::TREE_BITMAP);
         let allocator = Allocator::new(Layout::DATA_BITMAP);
         Ok(Self { device, directory, allocator })
     }
@@ -45,7 +45,7 @@ where
 
     pub fn format(device: &mut D) -> Result<(), Error> {
         Meta::new().store(device)?;
-        Directory::new(Layout::TREE_BITMAP).format(device)?;
+        Tree::new(Layout::TREE_BITMAP).format(device)?;
         Ok(())
     }
 
@@ -53,7 +53,7 @@ where
     where
         D: BlockDevice,
     {
-        path::validate(file_path)?;
+        paths::validate(file_path)?;
 
         let file_size = data.len();
         if file_size > Node::MAX_FILE_SIZE {
@@ -70,7 +70,7 @@ where
     }
 
     pub fn delete(&mut self, file_path: &str) -> Result<(), Error> {
-        path::validate(file_path)?;
+        paths::validate(file_path)?;
 
         let entry = self.directory.get_file(&mut self.device, file_path)?;
         let (file_handle, node_handle) = entry.get_handles();
@@ -87,7 +87,7 @@ where
     }
 
     pub fn open(&mut self, file_path: &str) -> Result<FileReader<D>, Error> {
-        path::validate(file_path)?;
+        paths::validate(file_path)?;
 
         let entry = self.directory.get_file(&mut self.device, file_path)?;
         let (_, node_handle) = entry.get_handles();
@@ -109,7 +109,8 @@ where
 
     #[cfg(feature = "std")]
     pub fn print_tree(&mut self, base_path: &str, depth: usize) -> Result<(), Error> {
-        self.directory.print_tree_stdout(&mut self.device, base_path, depth)
+        use crate::filesystem::directory::tree_printer;
+        tree_printer::print_tree_stdout(&mut self.device, base_path, depth)
     }
 
     #[cfg(feature = "std")]

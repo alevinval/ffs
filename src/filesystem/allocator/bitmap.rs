@@ -108,7 +108,7 @@ impl Deserializable<Self> for Bitmap {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
 
     use crate::test_serde_symmetry;
 

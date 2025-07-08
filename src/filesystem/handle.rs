@@ -55,7 +55,7 @@ where
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
 
     use crate::{filesystem::Store, test_utils::MockDevice};
 

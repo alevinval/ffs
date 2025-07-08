@@ -1,20 +1,15 @@
-use core::fmt;
-
 use crate::{
     BlockDevice, Error,
     filesystem::{
         Addr,
         allocator::Allocator,
         directory::{
-            Entry,
+            Entry, TreeNode,
             entry::EntryKind,
-            ntree::{
-                TreeNode,
-                visitors::{CounterVisitor, Visitor},
-            },
+            visitors::{CounterVisitor, Visitor},
         },
         layout::Layout,
-        path,
+        paths,
     },
 };
 
@@ -86,45 +81,6 @@ impl Tree {
         counter.walk_from_root(device, 0)?;
         Ok(counter.result())
     }
-
-    pub fn print_tree<D, W>(
-        &self,
-        device: &mut D,
-        base_path: &str,
-        depth: usize,
-        out: &mut W,
-    ) -> Result<(), Error>
-    where
-        D: BlockDevice,
-        W: fmt::Write,
-    {
-        find_and_then(device, base_path, 0, |device, _addr, node, pos| {
-            let entry = node.get(pos);
-            if !entry.is_dir() {
-                return Err(Error::DirectoryNotFound);
-            }
-            print_tree_in_order(device, entry.addr(), depth, 0, out)?;
-            Ok(())
-        })
-    }
-
-    #[cfg(feature = "std")]
-    pub fn print_tree_stdout<D>(
-        &self,
-        device: &mut D,
-        base_path: &str,
-        depth: usize,
-    ) -> Result<(), Error>
-    where
-        D: BlockDevice,
-    {
-        use std::{println, string::String};
-
-        let mut txt = String::new();
-        self.print_tree(device, base_path, depth, &mut txt)?;
-        println!("{txt}");
-        Ok(())
-    }
 }
 
 fn insert_file<D: BlockDevice>(
@@ -134,7 +90,7 @@ fn insert_file<D: BlockDevice>(
     addr: Addr,
 ) -> Result<Entry, Error> {
     let mut current = TreeNode::load(device, addr)?;
-    if path::dirname(file_path).is_empty() {
+    if paths::dirname(file_path).is_empty() {
         if current.find(file_path).is_some() {
             return Err(Error::FileAlreadyExists);
         }
@@ -144,8 +100,8 @@ fn insert_file<D: BlockDevice>(
         return entry;
     }
 
-    let next_path = path::tail(file_path);
-    let first_component = path::first_component(file_path);
+    let next_path = paths::tail(file_path);
+    let first_component = paths::first_component(file_path);
     if let Some(entry) = current.find(first_component) {
         return insert_file(device, allocator, next_path, entry.addr());
     }
@@ -156,7 +112,7 @@ fn insert_file<D: BlockDevice>(
     let next_addr = allocator.allocate(device)?;
     current.insert(first_component, next_addr, EntryKind::Dir)?;
 
-    let entry = if path::dirname(path::tail(file_path)).is_empty() {
+    let entry = if paths::dirname(paths::tail(file_path)).is_empty() {
         TreeNode::new_leaf()
     } else {
         TreeNode::new()
@@ -192,34 +148,7 @@ fn prune<D: BlockDevice>(
     Ok(false)
 }
 
-fn print_tree_in_order<D: BlockDevice, W: fmt::Write>(
-    device: &mut D,
-    addr: Addr,
-    max_depth: usize,
-    depth: usize,
-    out: &mut W,
-) -> Result<(), Error> {
-    if max_depth > 0 && depth >= max_depth {
-        return Ok(());
-    } else if depth == 0 {
-        if addr == 0 {
-            out.write_str("$/\n")?;
-        } else {
-            out.write_str("../\n")?;
-        }
-    }
-    let node = TreeNode::load(device, addr)?;
-    for entry in node.iter_entries().filter(|entry| entry.is_dir()) {
-        out.write_fmt(format_args!("{}{}/\n", "  ".repeat(depth + 1), entry.name().as_str()))?;
-        print_tree_in_order(device, entry.addr(), max_depth, depth + 1, out)?;
-    }
-    for entry in node.iter_entries().filter(|e| !e.is_dir()) {
-        out.write_fmt(format_args!("{}{}\n", "  ".repeat(depth + 1), entry.name().as_str()))?;
-    }
-    Ok(())
-}
-
-fn find_and_then<F, R, D: BlockDevice>(
+pub fn find_and_then<F, R, D: BlockDevice>(
     device: &mut D,
     file_path: &str,
     addr: Addr,
@@ -229,9 +158,9 @@ where
     F: FnMut(&mut D, Addr, &mut TreeNode, usize) -> Result<R, Error>,
 {
     let mut node = TreeNode::load(device, addr)?;
-    let first_component = path::first_component(file_path);
+    let first_component = paths::first_component(file_path);
     if let Some(pos) = node.find_index(first_component) {
-        let next_path = path::tail(file_path);
+        let next_path = paths::tail(file_path);
         if next_path == file_path {
             return cb(device, addr, &mut node, pos);
         }
@@ -241,12 +170,12 @@ where
 }
 
 #[cfg(test)]
-mod test {
-    use std::{println, string::String};
+mod tests {
+    use std::println;
 
     use crate::{
         disk::MemoryDisk,
-        filesystem::{SerdeLen, layout::Layout},
+        filesystem::{SerdeLen, directory::tree_printer, layout::Layout},
     };
 
     use super::*;
@@ -300,18 +229,18 @@ mod test {
     fn multiple_tree_ops() {
         let (mut device, mut tree) = get_sut();
         println!("tree before insertion:");
-        tree.print_tree_stdout(&mut device, "", 0).unwrap();
+        tree_printer::print_tree_stdout(&mut device, "", 0).unwrap();
         assert_eq!(0, tree.count_dirs(&mut device).unwrap());
 
         let _ = tree.insert_file(&mut device, "dir/second/third/file.txt").unwrap();
         println!("tree after insertion:");
-        tree.print_tree_stdout(&mut device, "", 0).unwrap();
+        tree_printer::print_tree_stdout(&mut device, "", 0).unwrap();
         assert_eq!(3, tree.count_dirs(&mut device).unwrap());
 
         let _ = tree.get_file(&mut device, "dir/second/third/file.txt").unwrap();
         tree.remove_file(&mut device, "/dir/second/third/file.txt").unwrap();
         println!("tree after removal:");
-        tree.print_tree_stdout(&mut device, "", 0).unwrap();
+        tree_printer::print_tree_stdout(&mut device, "", 0).unwrap();
 
         assert_eq!(
             Error::FileNotFound,
@@ -320,90 +249,7 @@ mod test {
 
         assert_eq!(Ok(false), tree.prune(&mut device, 0));
         println!("tree after prune:");
-        tree.print_tree_stdout(&mut device, "", 0).unwrap();
+        tree_printer::print_tree_stdout(&mut device, "", 0).unwrap();
         assert_eq!(0, tree.count_dirs(&mut device).unwrap());
-    }
-
-    #[test]
-    fn test_print_tree() {
-        let (mut device, mut tree) = get_sut();
-
-        let mut actual = String::new();
-        assert_eq!(Ok(()), tree.print_tree(&mut device, "", 0, &mut actual));
-        assert_eq!("$/\n", &actual);
-
-        tree.insert_file(&mut device, "dir1/dir2/old.txt").expect("should insert file");
-        tree.insert_file(&mut device, "dir1/dir2/dir3/file.txt").expect("shoud insert file");
-        let mut actual = String::new();
-        assert_eq!(Ok(()), tree.print_tree(&mut device, "", 0, &mut actual));
-        let expected = "$/
-  dir1/
-    dir2/
-      dir3/
-        file.txt
-      old.txt
-";
-        assert_eq!(expected, &actual);
-    }
-
-    #[test]
-    fn test_print_tree_relative() {
-        let (mut device, mut tree) = get_sut();
-
-        let mut actual = String::new();
-        assert_eq!(Ok(()), tree.print_tree(&mut device, "", 0, &mut actual));
-        assert_eq!("$/\n", &actual);
-
-        let _ = tree.insert_file(&mut device, "dir1/dir2/dir3/file.txt");
-        let mut actual = String::new();
-        assert_eq!(Ok(()), tree.print_tree(&mut device, "dir1/dir2", 0, &mut actual));
-        let expected = "../
-  dir3/
-    file.txt
-";
-        assert_eq!(expected, &actual);
-    }
-
-    #[test]
-    fn test_print_tree_relative_and_max_depth() {
-        let (mut device, mut tree) = get_sut();
-
-        let mut actual = String::new();
-        assert_eq!(Ok(()), tree.print_tree(&mut device, "", 0, &mut actual));
-        assert_eq!("$/\n", &actual);
-
-        let _ = tree.insert_file(&mut device, "dir1/dir2/dir3/file.txt");
-        let _ = tree.insert_file(&mut device, "dir1/dir3/file.txt");
-        let _ = tree.insert_file(&mut device, "dir1/dir3/dir4/dir5/file.txt");
-        let _ = tree.insert_file(&mut device, "dir1/file.txt");
-        let mut actual = String::new();
-        assert_eq!(Ok(()), tree.print_tree(&mut device, "dir1", 2, &mut actual));
-        let expected = "../
-  dir2/
-    dir3/
-  dir3/
-    dir4/
-    file.txt
-  file.txt
-";
-        assert_eq!(expected, &actual);
-    }
-
-    #[test]
-    fn test_print_file_fails() {
-        let (mut device, mut tree) = get_sut();
-
-        let mut actual = String::new();
-        assert_eq!(Ok(()), tree.print_tree(&mut device, "", 0, &mut actual));
-        assert_eq!("$/\n", &actual);
-
-        let _ = tree.insert_file(&mut device, "dir1/dir2/dir3/file.txt");
-        let _ = tree.insert_file(&mut device, "dir1/dir3/file.txt");
-        let _ = tree.insert_file(&mut device, "dir1/dir3/dir4/dir5/file.txt");
-        let _ = tree.insert_file(&mut device, "dir1/file.txt");
-
-        let mut out = String::new();
-        let result = tree.print_tree(&mut device, "dir1/file.txt", 0, &mut out);
-        assert_eq!(Err(Error::DirectoryNotFound), result)
     }
 }

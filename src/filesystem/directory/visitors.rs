@@ -1,10 +1,10 @@
 use crate::{
     BlockDevice, Error,
-    filesystem::{Addr, DirectoryNode, directory::entry::EntryKind},
+    filesystem::{Addr, TreeNode, directory::entry::EntryKind},
 };
 
 pub trait Visitor {
-    fn visit(&mut self, node: &DirectoryNode, depth: usize) -> Result<(), Error>;
+    fn visit(&mut self, node: &TreeNode, depth: usize) -> Result<(), Error>;
 
     fn walk_tree<D: BlockDevice>(
         &mut self,
@@ -12,7 +12,7 @@ pub trait Visitor {
         addr: Addr,
         depth: usize,
     ) -> Result<(), Error> {
-        let current_node = DirectoryNode::load(device, addr)?;
+        let current_node = TreeNode::load(device, addr)?;
         for entry in current_node.iter_entries().filter(|entry| entry.is_dir()) {
             self.walk_tree(device, entry.addr(), depth + 1)?;
         }
@@ -39,7 +39,7 @@ impl CounterVisitor {
         Self { kind, count: 0 }
     }
 
-    pub fn visit(&mut self, node: &DirectoryNode, _depth: usize) -> Result<(), Error> {
+    pub fn visit(&mut self, node: &TreeNode, _depth: usize) -> Result<(), Error> {
         self.count += node.iter_entries().filter(|entry| entry.kind() == self.kind).count();
         Ok(())
     }
@@ -50,7 +50,7 @@ impl CounterVisitor {
 }
 
 impl Visitor for CounterVisitor {
-    fn visit(&mut self, node: &DirectoryNode, depth: usize) -> Result<(), Error> {
+    fn visit(&mut self, node: &TreeNode, depth: usize) -> Result<(), Error> {
         self.visit(node, depth)
     }
 }

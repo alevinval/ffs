@@ -7,7 +7,7 @@
 
 use crate::{
     Error,
-    filesystem::{Deserializable, SerdeLen, Serializable, path},
+    filesystem::{Deserializable, SerdeLen, Serializable, paths},
     io::{Read, Write},
 };
 
@@ -32,7 +32,7 @@ impl Name {
     /// [`Self::MAX_LEN`].
     pub fn new(name: &str) -> Result<Self, Error> {
         debug_assert!(
-            !name.contains(path::SEPARATOR),
+            !name.contains(paths::SEPARATOR),
             "file names should never contain a separator character"
         );
 

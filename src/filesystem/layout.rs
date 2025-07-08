@@ -1,7 +1,7 @@
-use crate::filesystem::{Addr, SerdeLen, allocator::Bitmap, directory::DirectoryNode, node::Node};
+use crate::filesystem::{Addr, SerdeLen, allocator::Bitmap, directory::TreeNode, node::Node};
 
 const N_TREE: usize = 100;
-const N_FILE: usize = N_TREE * DirectoryNode::LEN;
+const N_FILE: usize = N_TREE * TreeNode::LEN;
 const N_DATA: usize = Node::BLOCKS_PER_NODE * N_FILE;
 const N_FREE: usize = N_DATA / Bitmap::SLOTS;
 
@@ -15,7 +15,7 @@ pub struct Layout {
 impl Layout {
     pub const META: Self = Self::new(0, 1);
     pub const TREE_BITMAP: Self = next(Self::META, 1, 1);
-    pub const TREE: Self = next(Self::TREE_BITMAP, N_TREE, DirectoryNode::SERDE_BLOCK_COUNT);
+    pub const TREE: Self = next(Self::TREE_BITMAP, N_TREE, TreeNode::SERDE_BLOCK_COUNT);
     pub const FILE: Self = next(Self::TREE, N_FILE, 1);
     pub const NODE: Self = next(Self::FILE, N_FILE, 1);
     pub const DATA_BITMAP: Self = next(Self::NODE, N_FREE, 1);
@@ -83,7 +83,7 @@ const fn next(prev: Layout, capacity: usize, entry_size: usize) -> Layout {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
 
     use super::*;
 

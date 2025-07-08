@@ -1,5 +1,5 @@
 pub use controller::Controller;
-pub use directory::DirectoryNode;
+pub use directory::TreeNode;
 pub use file_reader::FileReader;
 pub use name::Name;
 pub use node::Node;
@@ -25,7 +25,7 @@ mod meta;
 mod name;
 mod node;
 mod node_writer;
-mod path;
+mod paths;
 
 pub type Addr = u32; // Logical address type for sectors/blocks. Change here to update everywhere.
 

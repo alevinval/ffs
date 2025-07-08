@@ -63,7 +63,7 @@ impl Deserializable<Self> for Node {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
 
     use crate::test_serde_symmetry;
 
