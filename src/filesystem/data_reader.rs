@@ -4,7 +4,7 @@ use crate::{
     io::Writer,
 };
 
-pub struct FileReader<'dev, D>
+pub struct DataReader<'dev, D>
 where
     D: BlockDevice,
 {
@@ -12,7 +12,7 @@ where
     node: Node,
 }
 
-impl<'dev, D> FileReader<'dev, D>
+impl<'dev, D> DataReader<'dev, D>
 where
     D: BlockDevice,
 {

@@ -1,9 +1,6 @@
 use crate::{
     Error,
-    filesystem::{
-        Addr, Deserializable, Name, SerdeLen, Serializable,
-        handle::{FileHandle, NodeHandle},
-    },
+    filesystem::{Addr, Deserializable, Name, SerdeLen, Serializable},
     io::{Read, Write},
 };
 
@@ -41,10 +38,6 @@ impl Entry {
 
     pub const fn is_set(&self) -> bool {
         self.addr != 0
-    }
-
-    pub const fn get_handles(&self) -> (FileHandle, NodeHandle) {
-        (FileHandle::new(self.addr), NodeHandle::new(self.addr))
     }
 }
 

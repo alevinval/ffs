@@ -36,9 +36,7 @@ impl SerdeLen for Node {
 }
 
 impl Addressable for Node {
-    fn layout() -> Layout {
-        Layout::NODE
-    }
+    const LAYOUT: Layout = Layout::NODE;
 }
 
 impl Serializable for Node {

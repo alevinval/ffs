@@ -1,8 +1,6 @@
 use crate::{
-    BlockDevice, Error,
-    filesystem::{
-        Addr, Addressable, Block, Deserializable, Layout, Name, SerdeLen, Serializable, Store,
-    },
+    Error,
+    filesystem::{Addr, Addressable, Deserializable, Layout, Name, SerdeLen, Serializable},
     io::{Read, Write},
 };
 
@@ -43,26 +41,16 @@ impl Deserializable<Self> for File {
 }
 
 impl Addressable for File {
-    fn layout() -> Layout {
-        Layout::FILE
-    }
-}
-
-impl<D> Store<D> for File
-where
-    D: BlockDevice,
-{
-    fn store(&self, device: &mut D) -> Result<(), Error> {
-        let sector = Layout::FILE.nth(self.node_addr);
-        let mut block = Block::new();
-        self.serialize(&mut block.writer())?;
-        device.write(sector, &block)
-    }
+    const LAYOUT: Layout = Layout::FILE;
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{test_serde_symmetry, test_utils::MockDevice};
+    use crate::{
+        filesystem::{block::Block, storage},
+        test_serde_symmetry,
+        test_utils::MockDevice,
+    };
 
     use super::*;
 
@@ -72,8 +60,7 @@ mod tests {
     fn write_to_device() -> Result<(), Error> {
         let mut device = MockDevice::new();
         let sut = File::new("some-file.txt".into(), 123);
-        sut.store(&mut device)?;
-
+        storage::store(&mut device, 123, &sut)?;
         let mut expected = Block::new();
         sut.serialize(&mut expected.writer())?;
         device.assert_write(0, Layout::FILE.nth(123), &expected);

@@ -8,7 +8,7 @@ pub(crate) mod test_utils;
 
 use core::fmt;
 
-pub use filesystem::{BlockDevice, Controller, FileReader};
+pub use filesystem::{BlockDevice, Controller, DataReader};
 
 use crate::filesystem::{Name, Node, TreeNode};
 

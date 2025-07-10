@@ -1,17 +1,15 @@
 use crate::{
     BlockDevice, Error,
     filesystem::{
-        EraseFrom, Layout, LoadFrom, LoadFromStatic, Store,
+        EraseFrom, Layout, LoadFrom,
         allocator::{Allocator, DataAllocator},
         cache::BlockCache,
-        data_writer::DataWriter,
+        data_reader::DataReader,
         directory::Tree,
         file::File,
-        file_reader::FileReader,
         meta::Meta,
         node::Node,
-        node_writer::NodeWriter,
-        paths,
+        paths, storage,
     },
 };
 
@@ -30,7 +28,7 @@ where
     D: BlockDevice,
 {
     pub fn mount(mut device: D) -> Result<Self, Error> {
-        if Meta::load_from(&mut device)? != Meta::new() {
+        if Meta::load_from(&mut device, 0)? != Meta::new() {
             return Err(Error::UnsupportedDevice);
         }
         let device = BlockCache::mount(device);
@@ -44,7 +42,7 @@ where
     }
 
     pub fn format(device: &mut D) -> Result<(), Error> {
-        Meta::new().store(device)?;
+        storage::store(device, 0, &Meta::new())?;
         Tree::new(Layout::TREE_BITMAP).format(device)?;
         Ok(())
     }
@@ -63,9 +61,9 @@ where
         let entry = self.directory.insert_file(&mut self.device, file_path)?;
         let file = File::new(*entry.name(), entry.addr());
         let node = self.allocator.allocate_node_data(&mut self.device, file_size)?;
-        DataWriter::new(node.data_addrs(), data).store(&mut self.device)?;
-        NodeWriter::new(file.node_addr(), &node).store(&mut self.device)?;
-        file.store(&mut self.device)?;
+        storage::store_data(&mut self.device, node.data_addrs(), data)?;
+        storage::store(&mut self.device, file.node_addr(), &node)?;
+        storage::store(&mut self.device, file.node_addr(), &file)?;
         Ok(())
     }
 
@@ -73,11 +71,9 @@ where
         paths::validate(file_path)?;
 
         let entry = self.directory.get_file(&mut self.device, file_path)?;
-        let (file_handle, node_handle) = entry.get_handles();
-        let node = node_handle.load_from(&mut self.device)?;
-
-        node_handle.erase_from(&mut self.device)?;
-        file_handle.erase_from(&mut self.device)?;
+        let node = Node::load_from(&mut self.device, entry.addr())?;
+        Node::erase_from(&mut self.device, entry.addr())?;
+        File::erase_from(&mut self.device, entry.addr())?;
         self.directory.remove_file(&mut self.device, file_path)?;
         self.directory.prune(&mut self.device, 0)?;
 
@@ -86,13 +82,12 @@ where
         Ok(())
     }
 
-    pub fn open(&mut self, file_path: &str) -> Result<FileReader<D>, Error> {
+    pub fn open(&mut self, file_path: &str) -> Result<DataReader<D>, Error> {
         paths::validate(file_path)?;
 
         let entry = self.directory.get_file(&mut self.device, file_path)?;
-        let (_, node_handle) = entry.get_handles();
-        let node = node_handle.load_from(&mut self.device)?;
-        Ok(FileReader::new(&mut self.device, node))
+        let node = Node::load_from(&mut self.device, entry.addr())?;
+        Ok(DataReader::new(&mut self.device, node))
     }
 
     pub fn count_files(&mut self) -> Result<usize, Error> {

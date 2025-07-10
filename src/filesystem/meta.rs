@@ -1,8 +1,5 @@
 use crate::{
-    filesystem::{
-        Addr, Block, BlockDevice, Deserializable, EraseFrom, Error, Layout, LoadFromStatic,
-        SerdeLen, Serializable, Store,
-    },
+    filesystem::{Addr, Addressable, Block, Deserializable, Error, Layout, SerdeLen, Serializable},
     io::{Read, Write},
 };
 
@@ -39,6 +36,10 @@ impl Meta {
             signature: Self::SIGNATURE,
         }
     }
+}
+
+impl Addressable for Meta {
+    const LAYOUT: Layout = Layout::META;
 }
 
 impl SerdeLen for Meta {
@@ -86,44 +87,13 @@ impl Deserializable<Self> for Meta {
     }
 }
 
-impl<D> Store<D> for Meta
-where
-    D: BlockDevice,
-{
-    fn store(&self, device: &mut D) -> Result<(), Error> {
-        let mut block = Block::new();
-        self.serialize(&mut block.writer())?;
-
-        let sector = Layout::META.begin;
-        device.write(sector, &block)
-    }
-}
-
-impl<D> LoadFromStatic<D> for Meta
-where
-    D: BlockDevice,
-{
-    type Item = Self;
-
-    fn load_from(device: &mut D) -> Result<Self, Error> {
-        let mut block = Block::new();
-        device.read(0, &mut block)?;
-        Self::deserialize(&mut block.reader())
-    }
-}
-
-impl<D> EraseFrom<D> for Meta
-where
-    D: BlockDevice,
-{
-    fn erase_from(&self, device: &mut D) -> Result<(), Error> {
-        device.write(Layout::META.begin, &Block::new())
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::{test_serde_symmetry, test_utils::MockDevice};
+    use crate::{
+        filesystem::{LoadFrom, storage},
+        test_serde_symmetry,
+        test_utils::MockDevice,
+    };
 
     use super::*;
 
@@ -133,16 +103,7 @@ mod tests {
     fn write_to_device_then_read() {
         let mut device = MockDevice::new();
         let expected = Meta::new();
-        assert_eq!(Ok(()), expected.store(&mut device));
-        assert_eq!(Ok(expected), Meta::load_from(&mut device));
-    }
-
-    #[test]
-    fn erase_from_device() {
-        let mut device = MockDevice::new();
-        let sut = Meta::new();
-        assert_eq!(Ok(()), sut.erase_from(&mut device));
-
-        device.assert_write(0, 0, &[0u8; Block::LEN]);
+        assert_eq!(Ok(()), storage::store(&mut device, 0, &expected));
+        assert_eq!(Ok(expected), Meta::load_from(&mut device, 0));
     }
 }
