@@ -29,14 +29,18 @@ impl Node {
     pub const fn file_len(&self) -> u16 {
         self.file_len
     }
-}
 
-impl SerdeLen for Node {
-    const SERDE_LEN: usize = 2 + (size_of::<Addr>() * Self::BLOCKS_PER_NODE);
+    pub const fn blocks_needed(&self) -> usize {
+        (self.file_len as usize).div_ceil(Block::LEN)
+    }
 }
 
 impl Addressable for Node {
     const LAYOUT: Layout = Layout::NODE;
+}
+
+impl SerdeLen for Node {
+    const SERDE_LEN: usize = 2 + (size_of::<Addr>() * Self::BLOCKS_PER_NODE);
 }
 
 impl Serializable for Node {
@@ -53,7 +57,7 @@ impl Deserializable<Self> for Node {
     fn deserialize<R: Read>(reader: &mut R) -> Result<Self, Error> {
         let file_len = reader.read_u16()?;
         let mut block_addrs = [0 as Addr; Self::BLOCKS_PER_NODE];
-        for addr in block_addrs.iter_mut() {
+        for addr in &mut block_addrs {
             *addr = reader.read_addr()?;
         }
         Ok(Self { file_len, data_addrs: block_addrs })
@@ -68,4 +72,16 @@ mod tests {
     use super::*;
 
     test_serde_symmetry!(Node, Node::new(5120, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]));
+
+    #[test]
+    fn test_node_blocks_needed() {
+        let node = Node::new(1, [0; Node::BLOCKS_PER_NODE]);
+        assert_eq!(1, node.blocks_needed());
+
+        let node = Node::new(1024, [0; Node::BLOCKS_PER_NODE]);
+        assert_eq!(2, node.blocks_needed());
+
+        let node = Node::new(1025, [0; Node::BLOCKS_PER_NODE]);
+        assert_eq!(3, node.blocks_needed());
+    }
 }

@@ -3,52 +3,54 @@ use crate::{
     filesystem::{
         Addr,
         allocator::Allocator,
-        directory::{
-            Entry, TreeNode,
-            entry::EntryKind,
+        paths, storage,
+        tree::{
+            entry::Kind,
             visitors::{CounterVisitor, Visitor},
         },
-        layout::Layout,
-        paths,
     },
 };
+pub use entry::Entry;
+pub use tree_node::TreeNode;
+
+mod entry;
+pub mod printer;
+mod tree_node;
+mod visitors;
 
 #[derive(Debug)]
-pub struct Tree {
-    allocator: Allocator,
-}
+pub struct Tree;
 
 impl Tree {
-    pub const fn new(layout: Layout) -> Self {
-        let allocator = Allocator::new(layout);
-        Self { allocator }
-    }
-
-    pub fn format<D: BlockDevice>(&mut self, device: &mut D) -> Result<(), Error> {
-        TreeNode::new().store(device, 0)?;
-        self.allocator.allocate(device)?;
+    pub fn format<D: BlockDevice>(device: &mut D, allocator: &mut Allocator) -> Result<(), Error> {
+        storage::store(device, 0, &TreeNode::new())?;
+        allocator.allocate(device)?;
         Ok(())
     }
 
-    pub fn insert_file<D>(&mut self, device: &mut D, file_path: &str) -> Result<Entry, Error>
+    pub fn insert_file<D>(
+        device: &mut D,
+        allocator: &mut Allocator,
+        file_path: &str,
+    ) -> Result<Entry, Error>
     where
         D: BlockDevice,
     {
-        insert_file(device, &mut self.allocator, file_path, 0)
+        insert_file(device, allocator, file_path, 0)
     }
 
-    pub fn remove_file<D>(&self, device: &mut D, file_path: &str) -> Result<(), Error>
+    pub fn remove_file<D>(device: &mut D, file_path: &str) -> Result<(), Error>
     where
         D: BlockDevice,
     {
         find_and_then(device, file_path, 0, |device, addr, parent, pos| {
             *parent.get_mut(pos) = Entry::empty();
-            parent.store(device, addr)?;
+            storage::store(device, addr, parent)?;
             Ok(())
         })
     }
 
-    pub fn get_file<D>(&self, device: &mut D, file_path: &str) -> Result<Entry, Error>
+    pub fn get_file<D>(device: &mut D, file_path: &str) -> Result<Entry, Error>
     where
         D: BlockDevice,
     {
@@ -57,27 +59,27 @@ impl Tree {
         })
     }
 
-    pub fn prune<D>(&mut self, device: &mut D, addr: Addr) -> Result<bool, Error>
+    pub fn prune<D>(device: &mut D, allocator: &mut Allocator, addr: Addr) -> Result<bool, Error>
     where
         D: BlockDevice,
     {
-        prune(device, &mut self.allocator, addr)
+        prune(device, allocator, addr)
     }
 
-    pub fn count_files<D>(&self, device: &mut D) -> Result<usize, Error>
+    pub fn count_files<D>(device: &mut D) -> Result<usize, Error>
     where
         D: BlockDevice,
     {
-        let mut counter = CounterVisitor::new(EntryKind::File);
+        let mut counter = CounterVisitor::new(Kind::File);
         counter.walk_from_root(device, 0)?;
         Ok(counter.result())
     }
 
-    pub fn count_dirs<D>(&self, device: &mut D) -> Result<usize, Error>
+    pub fn count_dirs<D>(device: &mut D) -> Result<usize, Error>
     where
         D: BlockDevice,
     {
-        let mut counter = CounterVisitor::new(EntryKind::Dir);
+        let mut counter = CounterVisitor::new(Kind::Dir);
         counter.walk_from_root(device, 0)?;
         Ok(counter.result())
     }
@@ -95,8 +97,8 @@ fn insert_file<D: BlockDevice>(
             return Err(Error::FileAlreadyExists);
         }
 
-        let entry = current.insert(file_path, addr, EntryKind::File);
-        current.store(device, addr)?;
+        let entry = current.insert(file_path, addr, Kind::File);
+        storage::store(device, addr, &current)?;
         return entry;
     }
 
@@ -110,16 +112,15 @@ fn insert_file<D: BlockDevice>(
     // First check if the current node can fit another child directory.
     current.find_unset().ok_or(Error::StorageFull)?;
     let next_addr = allocator.allocate(device)?;
-    current.insert(first_component, next_addr, EntryKind::Dir)?;
+    current.insert(first_component, next_addr, Kind::Dir)?;
 
     let entry = if paths::dirname(paths::tail(file_path)).is_empty() {
         TreeNode::new_leaf()
     } else {
         TreeNode::new()
     };
-    entry.store(device, next_addr)?;
-    current.store(device, addr)?;
-
+    storage::store(device, next_addr, &entry)?;
+    storage::store(device, addr, &current)?;
     insert_file(device, allocator, next_path, next_addr)
 }
 
@@ -143,7 +144,7 @@ fn prune<D: BlockDevice>(
         return Ok(true);
     }
     if dirty {
-        current.store(device, addr)?;
+        storage::store(device, addr, &current)?;
     }
     Ok(false)
 }
@@ -175,19 +176,19 @@ mod tests {
 
     use crate::{
         disk::MemoryDisk,
-        filesystem::{SerdeLen, directory::tree_printer, layout::Layout},
+        filesystem::{SerdeLen, layouts::Layout, tree::printer},
     };
 
     use super::*;
 
     const TEST_LAYOUT: Layout = Layout::new(0, 10);
 
-    fn get_sut() -> (MemoryDisk, Tree) {
+    fn prepare() -> (MemoryDisk, Allocator) {
         let mut device =
             MemoryDisk::new(512, TEST_LAYOUT.entries_count() as usize * TreeNode::SERDE_LEN);
-        let mut tree = Tree::new(TEST_LAYOUT);
-        tree.format(&mut device).expect("failed to format device");
-        (device, tree)
+        let mut allocator = Allocator::new(TEST_LAYOUT);
+        Tree::format(&mut device, &mut allocator).expect("failed to format device");
+        (device, allocator)
     }
 
     fn find_entry_addr<D: BlockDevice>(
@@ -202,13 +203,13 @@ mod tests {
 
     #[test]
     fn test_find_addr_for_path_root() {
-        let (mut device, _) = get_sut();
+        let (mut device, _) = prepare();
         assert_eq!(Ok(0), find_entry_addr(&mut device, "", 0));
     }
 
     #[test]
     fn test_find_addr_for_path_missing() {
-        let (mut device, _) = get_sut();
+        let (mut device, _) = prepare();
         assert_eq!(
             Err(Error::FileNotFound),
             find_entry_addr(&mut device, "missing/path/file.txt", 0)
@@ -217,8 +218,9 @@ mod tests {
 
     #[test]
     fn test_find_addr_for_path_found() {
-        let (mut device, mut tree) = get_sut();
-        tree.insert_file(&mut device, "some/path/file.txt").expect("cannot insert file");
+        let (mut device, mut allocator) = prepare();
+        Tree::insert_file(&mut device, &mut allocator, "some/path/file.txt")
+            .expect("cannot insert file");
         assert_eq!(Ok(0), find_entry_addr(&mut device, "", 0));
         assert_eq!(Ok(1), find_entry_addr(&mut device, "some", 0));
         assert_eq!(Ok(2), find_entry_addr(&mut device, "some/path", 0));
@@ -227,29 +229,30 @@ mod tests {
 
     #[test]
     fn multiple_tree_ops() {
-        let (mut device, mut tree) = get_sut();
+        let (mut device, mut allocator) = prepare();
         println!("tree before insertion:");
-        tree_printer::print_tree_stdout(&mut device, "", 0).unwrap();
-        assert_eq!(0, tree.count_dirs(&mut device).unwrap());
+        printer::print(&mut device, "", 0).unwrap();
+        assert_eq!(0, Tree::count_dirs(&mut device).unwrap());
 
-        let _ = tree.insert_file(&mut device, "dir/second/third/file.txt").unwrap();
+        let _ =
+            Tree::insert_file(&mut device, &mut allocator, "dir/second/third/file.txt").unwrap();
         println!("tree after insertion:");
-        tree_printer::print_tree_stdout(&mut device, "", 0).unwrap();
-        assert_eq!(3, tree.count_dirs(&mut device).unwrap());
+        printer::print(&mut device, "", 0).unwrap();
+        assert_eq!(3, Tree::count_dirs(&mut device).unwrap());
 
-        let _ = tree.get_file(&mut device, "dir/second/third/file.txt").unwrap();
-        tree.remove_file(&mut device, "/dir/second/third/file.txt").unwrap();
+        let _ = Tree::get_file(&mut device, "dir/second/third/file.txt").unwrap();
+        Tree::remove_file(&mut device, "/dir/second/third/file.txt").unwrap();
         println!("tree after removal:");
-        tree_printer::print_tree_stdout(&mut device, "", 0).unwrap();
+        printer::print(&mut device, "", 0).unwrap();
 
         assert_eq!(
             Error::FileNotFound,
-            tree.get_file(&mut device, "/dir/second/third/file.txt").unwrap_err()
+            Tree::get_file(&mut device, "/dir/second/third/file.txt").unwrap_err()
         );
 
-        assert_eq!(Ok(false), tree.prune(&mut device, 0));
+        assert_eq!(Ok(false), Tree::prune(&mut device, &mut allocator, 0));
         println!("tree after prune:");
-        tree_printer::print_tree_stdout(&mut device, "", 0).unwrap();
-        assert_eq!(0, tree.count_dirs(&mut device).unwrap());
+        printer::print(&mut device, "", 0).unwrap();
+        assert_eq!(0, Tree::count_dirs(&mut device).unwrap());
     }
 }

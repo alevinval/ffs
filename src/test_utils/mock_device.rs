@@ -28,7 +28,7 @@ impl MockDevice {
 impl BlockDevice for MockDevice {
     fn read(&mut self, sector: Addr, buf: &mut [u8]) -> Result<(), Error> {
         self.reads.push((sector, buf.into()));
-        for (s, write) in self.writes.iter() {
+        for (s, write) in &self.writes {
             if *s == sector {
                 buf.copy_from_slice(write);
                 break;

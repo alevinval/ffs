@@ -134,7 +134,7 @@ mod tests {
     #[test]
     fn test_count_free_addresses() {
         let sut = Bitmap::new();
-        assert_eq!(4096, sut.count_free_addresses())
+        assert_eq!(4096, sut.count_free_addresses());
     }
 
     #[test]

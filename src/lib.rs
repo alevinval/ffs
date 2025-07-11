@@ -1,4 +1,6 @@
 #![no_std]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::missing_errors_doc)]
 
 #[cfg(feature = "std")]
 extern crate std;

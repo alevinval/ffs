@@ -1,6 +1,6 @@
 use crate::{
     BlockDevice, Error,
-    filesystem::{Addr, TreeNode, directory::entry::EntryKind},
+    filesystem::{Addr, TreeNode, tree::entry::Kind},
 };
 
 pub trait Visitor {
@@ -30,18 +30,17 @@ pub trait Visitor {
 }
 
 pub struct CounterVisitor {
-    kind: EntryKind,
+    kind: Kind,
     count: usize,
 }
 
 impl CounterVisitor {
-    pub const fn new(kind: EntryKind) -> Self {
+    pub const fn new(kind: Kind) -> Self {
         Self { kind, count: 0 }
     }
 
-    pub fn visit(&mut self, node: &TreeNode, _depth: usize) -> Result<(), Error> {
+    pub fn visit(&mut self, node: &TreeNode, _depth: usize) {
         self.count += node.iter_entries().filter(|entry| entry.kind() == self.kind).count();
-        Ok(())
     }
 
     pub const fn result(self) -> usize {
@@ -51,6 +50,7 @@ impl CounterVisitor {
 
 impl Visitor for CounterVisitor {
     fn visit(&mut self, node: &TreeNode, depth: usize) -> Result<(), Error> {
-        self.visit(node, depth)
+        self.visit(node, depth);
+        Ok(())
     }
 }

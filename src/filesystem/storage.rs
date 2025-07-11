@@ -1,17 +1,24 @@
 use crate::{
     BlockDevice, Error,
-    filesystem::{Addr, Addressable, Serializable, block::Block, layout::Layout},
+    filesystem::{Addr, Addressable, SerdeLen, Serializable, block::Block, layouts::Layout},
+    io::Writer,
 };
 
 pub fn store<D, T>(device: &mut D, logical_addr: Addr, object: &T) -> Result<(), Error>
 where
     D: BlockDevice,
-    T: Serializable + Addressable,
+    T: Addressable + Serializable + SerdeLen,
 {
-    let mut block = Block::new();
-    let mut writer = block.writer();
+    assert!(T::SERDE_BLOCK_COUNT <= 3, "nothing should serialize to more than 3 blocks");
+    let mut buf = [0u8; Block::LEN * 3];
+    let mut writer = Writer::new(&mut buf);
     object.serialize(&mut writer)?;
-    device.write(T::LAYOUT.nth(logical_addr), &block)
+
+    let addr = T::LAYOUT.nth(logical_addr);
+    for (i, chunk) in buf.chunks(Block::LEN).take(T::SERDE_BLOCK_COUNT).enumerate() {
+        device.write(addr + i as Addr, chunk)?;
+    }
+    Ok(())
 }
 
 pub fn store_data<D>(device: &mut D, block_addrs: &[Addr], data: &[u8]) -> Result<(), Error>
@@ -27,8 +34,7 @@ where
 
     for (i, chunk) in data.chunks(Block::LEN).enumerate() {
         let addr = block_addrs[i];
-        let sector = Layout::DATA.nth(addr);
-        device.write(sector, chunk)?;
+        device.write(Layout::DATA.nth(addr), chunk)?;
     }
     Ok(())
 }
@@ -64,6 +70,6 @@ mod tests {
         device.assert_write(1, Layout::DATA.nth(1), &[13u8; Block::LEN]);
         device.assert_write(2, Layout::DATA.nth(2), &[13u8; Block::LEN]);
         device.assert_write(3, Layout::DATA.nth(3), &[13u8; Block::LEN]);
-        device.assert_write(4, Layout::DATA.nth(4), &[13u8; Block::LEN][0..452]);
+        device.assert_write(4, Layout::DATA.nth(4), &[13u8; 452]);
     }
 }

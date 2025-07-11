@@ -3,24 +3,18 @@ use crate::{Error, filesystem::Name};
 pub const SEPARATOR: char = '/';
 
 pub fn validate(path: &str) -> Result<(), Error> {
-    let first = first_component(path);
-    if first == path && path.len() < Name::LEN {
+    let first_component = first_component(path);
+    if first_component == path && path.len() < Name::LEN {
         return Ok(());
     }
-    if first.len() >= Name::LEN {
+    if first_component.len() >= Name::LEN {
         return Err(Error::FileNameTooLong);
     }
     validate(tail(path))
 }
 
 pub fn dirname(path: &str) -> &str {
-    let path = norm(path);
-    path.rsplit_once(SEPARATOR).map(|(dirname, _)| dirname).unwrap_or_default()
-}
-
-pub fn basename(path: &str) -> &str {
-    let path = norm(path);
-    path.rsplit_once(SEPARATOR).map(|(_, basename)| basename).unwrap_or(path)
+    norm(path).rsplit_once(SEPARATOR).map(|(dirname, _)| dirname).unwrap_or_default()
 }
 
 pub fn tail(path: &str) -> &str {
@@ -33,8 +27,7 @@ pub fn tail(path: &str) -> &str {
 }
 
 pub fn first_component(path: &str) -> &str {
-    let path = norm(path);
-    path.split(SEPARATOR).next().unwrap_or("")
+    norm(path).split(SEPARATOR).next().unwrap_or("")
 }
 
 fn norm(path: &str) -> &str {
@@ -47,29 +40,38 @@ mod tests {
     use super::*;
 
     #[test]
-    fn basename_and_dirname() {
-        let name = "/path/to/file.txt";
-        assert_eq!("path/to", dirname(name));
-        assert_eq!("file.txt", basename(name));
+    fn test_validate() {
+        let mut input = "a".repeat(Name::LEN - 1);
+        assert!(validate(&input).is_ok());
 
-        let name = "file.txt";
-        assert_eq!("", dirname(name));
-        assert_eq!("file.txt", basename(name));
+        input += "/a/b/c/d/";
+        assert!(validate(&input).is_ok());
 
-        let name = "/";
-        assert_eq!("", dirname(name));
-        assert_eq!("", basename(name));
-
-        let name = "";
-        assert_eq!("", dirname(name));
-        assert_eq!("", basename(name));
+        input += "a".repeat(Name::LEN).as_str();
+        assert_eq!(Error::FileNameTooLong, validate(&input).unwrap_err());
     }
 
     #[test]
-    fn tail_path() {
-        let actual = tail("foo/bar/baz");
-        assert_eq!("bar/baz", actual);
-        assert_eq!("baz", tail(actual));
-        assert_eq!("baz", tail("baz"))
+    fn test_dirname() {
+        assert_eq!("", dirname(""));
+
+        assert_eq!("", dirname("/"));
+
+        let input = "/path/to/file.txt";
+        assert_eq!("path/to", dirname(input));
+
+        let input = "/path/to/file.txt/";
+        assert_eq!("path/to", dirname(input));
+
+        let input = "file.txt";
+        assert_eq!("", dirname(input));
+    }
+
+    #[test]
+    fn test_tail() {
+        let input = "foo/bar/baz";
+        assert_eq!("bar/baz", tail(input));
+        assert_eq!("baz", tail(tail(input)));
+        assert_eq!("baz", tail(tail(tail(input))));
     }
 }

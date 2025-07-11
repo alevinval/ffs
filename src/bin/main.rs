@@ -6,7 +6,7 @@ where
 {
     println!("> Listing tree at {base_path}");
     ctrl.print_tree(base_path, depth).unwrap();
-    println!()
+    println!();
 }
 
 fn rm_file<D>(ctrl: &mut Controller<D>, fname: &str)
@@ -15,13 +15,13 @@ where
 {
     println!("> Deleting {fname}");
     ctrl.delete(fname).expect("failed");
-    println!()
+    println!();
 }
 
 fn ls_stats(ctrl: &mut Controller<impl BlockDevice>) {
     let file_count = ctrl.count_files().expect("failed to count files");
     let dirs_count = ctrl.count_dirs().expect("failed to count free blocks");
-    let free_blocks = ctrl.free_data_blocks().expect("failed to count free blocks");
+    let free_blocks = ctrl.count_free_data_blocks().expect("failed to count free blocks");
     println!("> Stats:");
     println!("  files: {file_count}");
     println!("  dir_nodes: {dirs_count}");
@@ -86,7 +86,7 @@ Ligula congue sollicitudin erat viverra ac tincidunt nam. Euismod quam justo lec
     println!("> Reading file contents");
     let mut fd = ctrl.open(fname).expect("failed to open file");
     let mut buf = [0u8; ffs::Constants::MAX_FILE_SIZE];
-    fd.read(&mut buf).expect("failed to read file");
+    fd.readall(&mut buf).expect("failed to read file");
     println!("> Read {} bytes from {fname}", fd.file_len());
     println!("> Contents:\n\n{}\n", str::from_utf8(&buf[..fd.file_len() as usize]).unwrap());
 

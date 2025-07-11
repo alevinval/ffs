@@ -20,6 +20,10 @@ impl File {
     }
 }
 
+impl Addressable for File {
+    const LAYOUT: Layout = Layout::FILE;
+}
+
 impl SerdeLen for File {
     const SERDE_LEN: usize = 4 + Name::SERDE_LEN;
 }
@@ -40,10 +44,6 @@ impl Deserializable<Self> for File {
     }
 }
 
-impl Addressable for File {
-    const LAYOUT: Layout = Layout::FILE;
-}
-
 #[cfg(test)]
 mod tests {
     use crate::{
@@ -57,14 +57,12 @@ mod tests {
     test_serde_symmetry!(File, File::new("text.txt".into(), 123));
 
     #[test]
-    fn write_to_device() -> Result<(), Error> {
+    fn test_write_to_device() {
         let mut device = MockDevice::new();
         let sut = File::new("some-file.txt".into(), 123);
-        storage::store(&mut device, 123, &sut)?;
+        let _ = storage::store(&mut device, 123, &sut);
         let mut expected = Block::new();
-        sut.serialize(&mut expected.writer())?;
+        let _ = sut.serialize(&mut expected.writer());
         device.assert_write(0, Layout::FILE.nth(123), &expected);
-
-        Ok(())
     }
 }

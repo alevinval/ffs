@@ -1,11 +1,11 @@
 use crate::{
     BlockDevice, Error,
     filesystem::{
-        Addr, Deserializable, Layout, Name, SerdeLen, Serializable,
+        Addr, Addressable, Deserializable, Layout, Name, SerdeLen, Serializable,
         block::Block,
-        directory::entry::{Entry, EntryKind},
+        tree::entry::{Entry, Kind},
     },
-    io::{Read, Reader, Write, Writer},
+    io::{Read, Reader, Write},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -28,7 +28,7 @@ impl TreeNode {
         Self { entries }
     }
 
-    pub fn insert(&mut self, name: &str, addr: Addr, kind: EntryKind) -> Result<Entry, Error> {
+    pub fn insert(&mut self, name: &str, addr: Addr, kind: Kind) -> Result<Entry, Error> {
         let (_, entry) = self.find_unset().ok_or(Error::DirectoryFull)?;
         let name = Name::new(name)?;
         let value = Entry::new(name, addr, kind);
@@ -83,21 +83,6 @@ impl TreeNode {
         let mut reader = Reader::new(&buffer);
         Self::deserialize(&mut reader)
     }
-
-    pub fn store<D>(&self, device: &mut D, idx: Addr) -> Result<(), Error>
-    where
-        D: BlockDevice,
-    {
-        let start_sector = Self::LAYOUT.nth(idx);
-        let mut buffer = [0u8; Self::SERDE_BUFFER_LEN];
-        let mut writer = Writer::new(&mut buffer);
-        self.serialize(&mut writer)?;
-
-        for (i, chunk) in buffer.chunks(Block::LEN).enumerate() {
-            device.write(start_sector + i as Addr, chunk)?;
-        }
-        Ok(())
-    }
 }
 
 fn binary_search_index<T, K>(list: &[T], value: &K, get_key: impl Fn(&T) -> &K) -> Option<usize>
@@ -107,7 +92,7 @@ where
     let mut low = 0;
     let mut high = list.len();
     while low < high {
-        let mid = (low + high) / 2;
+        let mid = usize::midpoint(low, high);
         match get_key(&list[mid]).cmp(value) {
             core::cmp::Ordering::Less => low = mid + 1,
             core::cmp::Ordering::Equal => return Some(mid),
@@ -115,6 +100,10 @@ where
         }
     }
     None
+}
+
+impl Addressable for TreeNode {
+    const LAYOUT: Layout = Layout::TREE;
 }
 
 impl SerdeLen for TreeNode {
@@ -134,7 +123,7 @@ impl Serializable for TreeNode {
 impl Deserializable<Self> for TreeNode {
     fn deserialize<R: Read>(reader: &mut R) -> Result<Self, Error> {
         let mut entries = [const { Entry::empty() }; Self::LEN];
-        for entry in entries.iter_mut() {
+        for entry in &mut entries {
             *entry = Entry::deserialize(reader)?;
         }
 
@@ -157,13 +146,10 @@ mod tests {
         let mut sut = TreeNode::new();
         for i in 0..=TreeNode::LEN {
             let addr = Addr::from(i as u32);
-            let kind = if i % 2 == 0 { EntryKind::File } else { EntryKind::Dir };
+            let kind = if i % 2 == 0 { Kind::File } else { Kind::Dir };
             sut.insert(&format!("entry-{i}"), addr, kind).expect("should insert entry");
         }
 
-        assert_eq!(
-            Err(Error::DirectoryFull),
-            sut.insert("extra-entry", 100 as Addr, EntryKind::File)
-        );
+        assert_eq!(Err(Error::DirectoryFull), sut.insert("extra-entry", 100 as Addr, Kind::File));
     }
 }

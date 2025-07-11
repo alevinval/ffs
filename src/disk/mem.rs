@@ -24,19 +24,23 @@ pub struct MemoryDisk {
 }
 
 impl MemoryDisk {
+    #[must_use]
     pub fn fit(sectors: Addr) -> Self {
         Self::new(512, sectors as usize * 512)
     }
 
+    #[must_use]
     pub fn new(block_size: usize, capacity: usize) -> Self {
         let data = vec![0u8; capacity].into_boxed_slice();
         Self { block_size, data, pos: 0, reads_count: 0, writes_count: 0 }
     }
 
+    #[must_use]
     pub fn slice(&self, start: usize, end: usize) -> &[u8] {
         &self.data[start..end]
     }
 
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.pos
     }
@@ -49,20 +53,18 @@ impl MemoryDisk {
         self.pos = pos;
     }
 
-    fn read(&mut self, buf: &mut [u8]) -> Result<(), Error> {
+    fn read(&mut self, buf: &mut [u8]) {
         let len = buf.len().min(self.capacity());
         buf[..len].copy_from_slice(&self.data[self.pos..(self.pos + len)]);
         self.pos += len;
         self.reads_count += 1;
-        Ok(())
     }
 
-    fn write(&mut self, buf: &[u8]) -> Result<(), Error> {
+    fn write(&mut self, buf: &[u8]) {
         let len = buf.len().min(self.capacity());
         self.data[self.pos..(self.pos + len)].copy_from_slice(&buf[..len]);
         self.pos += len;
         self.writes_count += 1;
-        Ok(())
     }
 
     pub fn persist_to_file(&self, path: &str) -> std::io::Result<()> {
@@ -87,12 +89,14 @@ impl MemoryDisk {
 impl BlockDevice for MemoryDisk {
     fn read(&mut self, sector: Addr, buf: &mut [u8]) -> Result<(), Error> {
         self.seek(self.block_size * sector as usize);
-        self.read(buf)
+        self.read(buf);
+        Ok(())
     }
 
     fn write(&mut self, sector: Addr, buf: &[u8]) -> Result<(), Error> {
         self.seek(self.block_size * sector as usize);
-        self.write(buf).map(|_| ())
+        self.write(buf);
+        Ok(())
     }
 }
 
@@ -102,43 +106,42 @@ mod tests {
     use super::*;
 
     #[test]
-    fn capacity() {
+    fn test_capacity() {
         let sut = MemoryDisk::new(512, 1024);
         assert_eq!(1024, sut.capacity(), "disk capacity should be 1024 bytes");
     }
 
     #[test]
-    fn slice() {
+    fn test_slice() {
         let sut = MemoryDisk::new(512, 1024);
 
         assert_eq!([0, 0, 0, 0], sut.slice(0, 4), "disk should be initialized with zeros");
     }
 
     #[test]
-    fn position() {
+    fn test_position() {
         let sut = MemoryDisk::new(512, 1024);
         assert_eq!(0, sut.position());
     }
 
     #[test]
-    fn write() {
+    fn test_write() {
         let mut sut = MemoryDisk::new(512, 1024);
 
-        sut.write(&[1, 2, 3, 4]).expect("should write");
+        sut.write(&[1, 2, 3, 4]);
         assert_eq!([1, 2, 3, 4], sut.slice(0, 4), "disk should contain the written data");
         assert_eq!(4, sut.position());
     }
 
     #[test]
-    fn write_seek_read() {
+    fn test_write_seek_read() {
         let mut sut = MemoryDisk::new(512, 1024);
 
-        sut.write(&[1, 2, 3, 4]).expect("asd");
+        sut.write(&[1, 2, 3, 4]);
         sut.seek(0);
 
         let mut buf = [0u8; 4];
-        let result = sut.read(&mut buf);
-        assert!(result.is_ok(), "should succeed");
+        sut.read(&mut buf);
         assert_eq!([1, 2, 3, 4], buf);
     }
 }

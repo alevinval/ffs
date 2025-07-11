@@ -1,29 +1,29 @@
 pub use controller::Controller;
 pub use data_reader::DataReader;
-pub use directory::TreeNode;
 pub use name::Name;
 pub use node::Node;
+pub use tree::TreeNode;
 
 use crate::{
     Error,
     io::{Read, Write},
 };
 use block::Block;
-use layout::Layout;
+use layouts::Layout;
 
 pub mod allocator;
 mod block;
 mod cache;
 mod controller;
 mod data_reader;
-mod directory;
 mod file;
-mod layout;
+mod layouts;
 mod meta;
 mod name;
 mod node;
 mod paths;
 mod storage;
+mod tree;
 
 pub type Addr = u32; // Logical address type for sectors/blocks. Change here to update everywhere.
 
@@ -46,8 +46,10 @@ where
 }
 
 pub trait BlockDevice {
+    /// Reads a block of data from the specified sector into the provided buffer.
     fn read(&mut self, sector: Addr, buf: &mut [u8]) -> Result<(), Error>;
 
+    /// Writes a block of data to the specified sector.
     fn write(&mut self, sector: Addr, buf: &[u8]) -> Result<(), Error>;
 }
 

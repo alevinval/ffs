@@ -36,12 +36,6 @@ impl Block {
     }
 }
 
-impl Default for Block {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl Deref for Block {
     type Target = [u8];
 
@@ -58,7 +52,7 @@ impl DerefMut for Block {
 
 impl core::fmt::Debug for Block {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.write_str("[block]\n")?;
+        f.write_str("> Block:\n")?;
         for (i, byte) in self.inner.iter().enumerate() {
             f.write_fmt(format_args!(" {byte:02X}"))?;
             if (i + 1) % 32 == 0 {
@@ -66,15 +60,5 @@ impl core::fmt::Debug for Block {
             }
         }
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn len() {
-        assert_eq!(512, Block::LEN)
     }
 }

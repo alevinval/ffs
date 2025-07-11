@@ -8,23 +8,23 @@ use crate::{
 pub struct Entry {
     name: Name,
     addr: Addr,
-    kind: EntryKind,
+    kind: Kind,
 }
 
 impl Entry {
     pub const fn empty() -> Self {
-        Self { name: Name::empty(), addr: 0, kind: EntryKind::Dir }
+        Self { name: Name::empty(), addr: 0, kind: Kind::Dir }
     }
 
-    pub const fn new(name: Name, addr: Addr, kind: EntryKind) -> Self {
+    pub const fn new(name: Name, addr: Addr, kind: Kind) -> Self {
         Self { name, addr, kind }
     }
 
     pub const fn is_dir(&self) -> bool {
-        matches!(self.kind, EntryKind::Dir)
+        matches!(self.kind, Kind::Dir)
     }
 
-    pub const fn kind(&self) -> EntryKind {
+    pub const fn kind(&self) -> Kind {
         self.kind
     }
 
@@ -41,14 +41,8 @@ impl Entry {
     }
 }
 
-impl Default for Entry {
-    fn default() -> Self {
-        Self::empty()
-    }
-}
-
 impl SerdeLen for Entry {
-    const SERDE_LEN: usize = Name::SERDE_LEN + size_of::<Addr>() + EntryKind::SERDE_LEN;
+    const SERDE_LEN: usize = Name::SERDE_LEN + size_of::<Addr>() + Kind::SERDE_LEN;
 }
 
 impl Serializable for Entry {
@@ -64,22 +58,22 @@ impl Deserializable<Self> for Entry {
     fn deserialize<R: Read>(reader: &mut R) -> Result<Self, Error> {
         let name = Name::deserialize(reader)?;
         let addr = reader.read_addr()?;
-        let kind = EntryKind::deserialize(reader)?;
+        let kind = Kind::deserialize(reader)?;
         Ok(Self { name, addr, kind })
     }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum EntryKind {
+pub enum Kind {
     File,
     Dir,
 }
 
-impl SerdeLen for EntryKind {
+impl SerdeLen for Kind {
     const SERDE_LEN: usize = 1;
 }
 
-impl Serializable for EntryKind {
+impl Serializable for Kind {
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<usize, Error> {
         let kind_byte = match self {
             Self::File => 0,
@@ -90,7 +84,7 @@ impl Serializable for EntryKind {
     }
 }
 
-impl Deserializable<Self> for EntryKind {
+impl Deserializable<Self> for Kind {
     fn deserialize<R: Read>(reader: &mut R) -> Result<Self, Error> {
         let byte = reader.read_u8()?;
         match byte {
@@ -108,5 +102,5 @@ mod tests {
 
     use super::*;
 
-    test_serde_symmetry!(Entry, Entry::new("test_file".into(), 1, EntryKind::File));
+    test_serde_symmetry!(Entry, Entry::new("test_file".into(), 1, Kind::File));
 }

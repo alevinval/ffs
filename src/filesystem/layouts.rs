@@ -1,15 +1,15 @@
-use crate::filesystem::{Addr, SerdeLen, allocator::Bitmap, directory::TreeNode, node::Node};
+use crate::filesystem::{Addr, SerdeLen, allocator::Bitmap, node::Node, tree::TreeNode};
 
 const N_TREE: usize = 100;
 const N_FILE: usize = N_TREE * TreeNode::LEN;
 const N_DATA: usize = Node::BLOCKS_PER_NODE * N_FILE;
 const N_FREE: usize = N_DATA / Bitmap::SLOTS;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Layout {
-    pub begin: Addr,
-    pub end: Addr,
-    pub blocks_per_entry: Addr,
+    pub(crate) begin: Addr,
+    end: Addr,
+    blocks_per_entry: Addr,
 }
 
 impl Layout {
@@ -41,10 +41,7 @@ impl Layout {
     }
 
     pub const fn nth(&self, logical: Addr) -> Addr {
-        debug_assert!(
-            self.begin + logical * self.blocks_per_entry < self.end,
-            "Address out of range"
-        );
+        assert!(self.begin + logical * self.blocks_per_entry < self.end, "Address out of range");
 
         self.begin + (logical * self.blocks_per_entry)
     }
@@ -62,24 +59,24 @@ impl Layout {
     pub const fn iter_sectors(&self) -> core::ops::Range<Addr> {
         self.begin..self.end
     }
-
-    #[cfg(feature = "std")]
-    pub fn print_disk_layout() {
-        use std::println;
-        println!("Disk layout:");
-        println!("  Meta: {:?}", Self::META);
-        println!("  TreeBitmap: {:?}", Self::TREE_BITMAP);
-        println!("  Tree: {:?}", Self::TREE);
-        println!("  File: {:?}", Self::FILE);
-        println!("  Node: {:?}", Self::NODE);
-        println!("  DataBitmap: {:?}", Self::DATA_BITMAP);
-        println!("  Data: {:?}", Self::DATA);
-        println!();
-    }
 }
 
 const fn next(prev: Layout, capacity: usize, entry_size: usize) -> Layout {
     Layout::new_with_size(prev.end, capacity as Addr, entry_size as Addr)
+}
+
+#[cfg(feature = "std")]
+pub fn print() {
+    use std::println;
+    println!("Disk layout:");
+    println!("  Meta: {:?}", Layout::META);
+    println!("  TreeBitmap: {:?}", Layout::TREE_BITMAP);
+    println!("  Tree: {:?}", Layout::TREE);
+    println!("  File: {:?}", Layout::FILE);
+    println!("  Node: {:?}", Layout::NODE);
+    println!("  DataBitmap: {:?}", Layout::DATA_BITMAP);
+    println!("  Data: {:?}", Layout::DATA);
+    println!();
 }
 
 #[cfg(test)]
@@ -135,7 +132,7 @@ mod tests {
         let sut = Layout::new(5, 10);
         let iter = sut.iter_sectors();
         assert_eq!(5, iter.start);
-        assert_eq!(15, iter.end)
+        assert_eq!(15, iter.end);
     }
 
     #[test]

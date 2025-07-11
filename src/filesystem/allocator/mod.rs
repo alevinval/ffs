@@ -1,6 +1,6 @@
 use crate::{
     BlockDevice, Error,
-    filesystem::{Addr, Block, Deserializable, Serializable, layout::Layout, node::Node},
+    filesystem::{Addr, Block, Deserializable, Serializable, layouts::Layout, node::Node},
 };
 pub use bitmap::Bitmap;
 
@@ -53,17 +53,14 @@ impl Allocator {
 
         let mut current = 0;
         while current < n {
-            match self.allocate(device) {
-                Ok(addr) => {
-                    addrs[current] = addr;
-                    current += 1;
+            if let Ok(addr) = self.allocate(device) {
+                addrs[current] = addr;
+                current += 1;
+            } else {
+                for addr in addrs.iter().take(current) {
+                    self.release(device, *addr)?;
                 }
-                Err(_) => {
-                    for addr in addrs.iter().take(current) {
-                        self.release(device, *addr)?;
-                    }
-                    return Err(Error::StorageFull);
-                }
+                return Err(Error::StorageFull);
             }
         }
         Ok(())
