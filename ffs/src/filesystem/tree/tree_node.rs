@@ -12,6 +12,12 @@ pub struct TreeNode {
     entries: [Entry; Self::LEN],
 }
 
+impl Default for TreeNode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TreeNode {
     pub const LEN: usize = 30;
 

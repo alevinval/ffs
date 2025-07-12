@@ -63,7 +63,13 @@ impl Tree {
     where
         D: BlockDevice,
     {
-        find_and_then(device, path, 0, |_device, _addr, parent, _pos| Ok(parent.clone()))
+        find_and_then(device, path, 0, |_device, _addr, parent, pos| {
+            if !parent.get(pos).is_dir() {
+                return Err(Error::DirectoryNotFound);
+            }
+            Ok(parent.get(pos).clone())
+        })
+        .and_then(|entry| storage::load(device, entry.addr()))
     }
 
     pub fn prune<D>(device: &mut D, allocator: &mut Allocator, addr: Addr) -> Result<bool, Error>

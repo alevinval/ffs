@@ -79,6 +79,7 @@ Ligula congue sollicitudin erat viverra ac tincidunt nam. Euismod quam justo lec
 
     let _ = ctrl.create("/dirC/first/one.txt", data);
     let _ = ctrl.create("/dirC/first/two.txt", data);
+    let _ = ctrl.create("/dirC/first/deeper/sample.txt", data);
     let _ = ctrl.create("/dirC/second/three.txt", data);
     let _ = ctrl.create("/dirC/third/four.txt", data);
     let _ = ctrl.create("/dirD/boot/dev", data);
