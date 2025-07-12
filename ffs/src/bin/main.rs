@@ -5,7 +5,7 @@ where
     D: BlockDevice,
 {
     println!("> Listing tree at {base_path}");
-    ctrl.print_tree(base_path, depth).unwrap();
+    ctrl.print_tree_std(base_path, depth).unwrap();
     println!();
 }
 
@@ -96,6 +96,7 @@ Ligula congue sollicitudin erat viverra ac tincidunt nam. Euismod quam justo lec
     ls_tree(&mut ctrl, "", 0);
     ls_tree(&mut ctrl, "dirC", 0);
     ls_tree(&mut ctrl, "dirC", 1);
+    ls_tree(&mut ctrl, "dirC/first/", 1);
 
     let sdcard = ctrl.unmount();
     sdcard.persist_to_file("sdcard.img").expect("Failed to persist SD card image");

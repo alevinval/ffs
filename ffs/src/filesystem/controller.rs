@@ -1,3 +1,5 @@
+use core::fmt;
+
 use crate::{
     BlockDevice, Error,
     filesystem::{
@@ -9,7 +11,7 @@ use crate::{
         meta::Meta,
         node::Node,
         paths, storage,
-        tree::Tree,
+        tree::{Tree, printer},
     },
 };
 
@@ -103,16 +105,23 @@ where
         self.data_allocator.count_free_addresses(&mut self.device)
     }
 
+    pub fn print_tree<W>(&mut self, base_path: &str, depth: usize, out: &mut W) -> Result<(), Error>
+    where
+        W: fmt::Write,
+    {
+        paths::validate(base_path)?;
+        printer::print_to(&mut self.device, base_path, depth, out)
+    }
+
     #[cfg(feature = "std")]
-    pub fn print_tree(&mut self, base_path: &str, depth: usize) -> Result<(), Error> {
-        use crate::filesystem::tree::printer;
+    pub fn print_tree_std(&mut self, base_path: &str, depth: usize) -> Result<(), Error> {
+        paths::validate(base_path)?;
         printer::print(&mut self.device, base_path, depth)
     }
 
     #[cfg(feature = "std")]
     pub fn print_disk_layout(&self) {
         use crate::filesystem::layouts;
-
         layouts::print();
     }
 }

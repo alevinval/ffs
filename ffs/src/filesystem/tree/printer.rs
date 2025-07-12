@@ -73,13 +73,16 @@ mod tests {
 
     use super::*;
 
+    fn assert_empty_print<D: BlockDevice>(device: &mut D) {
+        let mut out = String::new();
+        assert_eq!(Ok(()), print_to(device, "", 0, &mut out));
+        assert_eq!("$/\n", &out);
+    }
+
     #[test]
     fn test_print_tree() {
         let (mut device, mut allocator) = setup_tree();
-
-        let mut actual = String::new();
-        assert_eq!(Ok(()), print_to(&mut device, "", 0, &mut actual));
-        assert_eq!("$/\n", &actual);
+        assert_empty_print(&mut device);
 
         Tree::insert_file(&mut device, &mut allocator, "dir1/dir2/old.txt")
             .expect("should insert file");
@@ -100,10 +103,7 @@ mod tests {
     #[test]
     fn test_print_tree_relative() {
         let (mut device, mut allocator) = setup_tree();
-
-        let mut actual = String::new();
-        assert_eq!(Ok(()), print_to(&mut device, "", 0, &mut actual));
-        assert_eq!("$/\n", &actual);
+        assert_empty_print(&mut device);
 
         let _ = Tree::insert_file(&mut device, &mut allocator, "dir1/dir2/dir3/file.txt");
         let mut actual = String::new();
@@ -118,10 +118,7 @@ mod tests {
     #[test]
     fn test_print_tree_relative_and_max_depth() {
         let (mut device, mut allocator) = setup_tree();
-
-        let mut actual = String::new();
-        assert_eq!(Ok(()), print_to(&mut device, "", 0, &mut actual));
-        assert_eq!("$/\n", &actual);
+        assert_empty_print(&mut device);
 
         let _ = Tree::insert_file(&mut device, &mut allocator, "dir1/dir2/dir3/file.txt");
         let _ = Tree::insert_file(&mut device, &mut allocator, "dir1/dir3/file.txt");
@@ -143,10 +140,7 @@ mod tests {
     #[test]
     fn test_print_file_fails() {
         let (mut device, mut allocator) = setup_tree();
-
-        let mut actual = String::new();
-        assert_eq!(Ok(()), print_to(&mut device, "", 0, &mut actual));
-        assert_eq!("$/\n", &actual);
+        assert_empty_print(&mut device);
 
         let _ = Tree::insert_file(&mut device, &mut allocator, "dir1/dir2/dir3/file.txt");
         let _ = Tree::insert_file(&mut device, &mut allocator, "dir1/dir3/file.txt");
