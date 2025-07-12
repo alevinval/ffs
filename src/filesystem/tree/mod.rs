@@ -91,7 +91,7 @@ fn insert_file<D: BlockDevice>(
     file_path: &str,
     addr: Addr,
 ) -> Result<Entry, Error> {
-    let mut current = TreeNode::load(device, addr)?;
+    let mut current: TreeNode = storage::load(device, addr)?;
     if paths::dirname(file_path).is_empty() {
         if current.find(file_path).is_some() {
             return Err(Error::FileAlreadyExists);
@@ -129,7 +129,7 @@ fn prune<D: BlockDevice>(
     allocator: &mut Allocator,
     addr: Addr,
 ) -> Result<bool, Error> {
-    let mut current = TreeNode::load(device, addr)?;
+    let mut current: TreeNode = storage::load(device, addr)?;
     let mut dirty = false;
     for entry in current.iter_entries_mut().filter(|entry| entry.is_dir()) {
         if let Ok(pruned) = prune(device, allocator, entry.addr())
@@ -158,7 +158,7 @@ pub fn find_and_then<F, R, D: BlockDevice>(
 where
     F: FnMut(&mut D, Addr, &mut TreeNode, usize) -> Result<R, Error>,
 {
-    let mut node = TreeNode::load(device, addr)?;
+    let mut node: TreeNode = storage::load(device, addr)?;
     let first_component = paths::first_component(file_path);
     if let Some(pos) = node.find_index(first_component) {
         let next_path = paths::tail(file_path);

@@ -1,7 +1,7 @@
 use crate::{
     BlockDevice, Error,
     filesystem::{
-        EraseFrom, Layout, LoadFrom,
+        Layout,
         allocator::{Allocator, DataAllocator},
         cache::BlockCache,
         data_reader::DataReader,
@@ -28,7 +28,8 @@ where
     D: BlockDevice,
 {
     pub fn mount(mut device: D) -> Result<Self, Error> {
-        if Meta::load_from(&mut device, 0)? != Meta::new() {
+        let meta: Meta = storage::load(&mut device, 0)?;
+        if meta != Meta::new() {
             return Err(Error::UnsupportedDevice);
         }
         let device = BlockCache::mount(device);
@@ -71,9 +72,9 @@ where
         paths::validate(file_path)?;
 
         let entry = Tree::get_file(&mut self.device, file_path)?;
-        let node = Node::load_from(&mut self.device, entry.addr())?;
-        Node::erase_from(&mut self.device, entry.addr())?;
-        File::erase_from(&mut self.device, entry.addr())?;
+        let node: Node = storage::load(&mut self.device, entry.addr())?;
+        storage::erase::<_, Node>(&mut self.device, entry.addr())?;
+        storage::erase::<_, File>(&mut self.device, entry.addr())?;
         Tree::remove_file(&mut self.device, file_path)?;
         Tree::prune(&mut self.device, &mut self.tree_allocator, 0)?;
 
@@ -86,7 +87,7 @@ where
         paths::validate(file_path)?;
 
         let entry = Tree::get_file(&mut self.device, file_path)?;
-        let node = Node::load_from(&mut self.device, entry.addr())?;
+        let node: Node = storage::load(&mut self.device, entry.addr())?;
         Ok(DataReader::new(&mut self.device, node))
     }
 

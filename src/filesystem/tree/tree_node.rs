@@ -1,11 +1,10 @@
 use crate::{
-    BlockDevice, Error,
+    Error,
     filesystem::{
         Addr, Addressable, Deserializable, Layout, Name, SerdeLen, Serializable,
-        block::Block,
         tree::entry::{Entry, Kind},
     },
-    io::{Read, Reader, Write},
+    io::{Read, Write},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -14,8 +13,6 @@ pub struct TreeNode {
 }
 
 impl TreeNode {
-    const LAYOUT: Layout = Layout::TREE;
-
     pub const LEN: usize = 30;
 
     pub const fn new() -> Self {
@@ -70,18 +67,6 @@ impl TreeNode {
         P: FnMut(&&Entry) -> bool,
     {
         self.entries.iter().filter(predicate)
-    }
-
-    pub fn load<D: BlockDevice>(device: &mut D, idx: Addr) -> Result<Self, Error> {
-        let mut buffer = [0u8; Self::SERDE_BUFFER_LEN];
-        let start_sector = Self::LAYOUT.nth(idx);
-
-        for (i, chunk) in buffer.chunks_mut(Block::LEN).enumerate() {
-            device.read(start_sector + i as Addr, chunk)?;
-        }
-
-        let mut reader = Reader::new(&buffer);
-        Self::deserialize(&mut reader)
     }
 }
 

@@ -1,7 +1,9 @@
 use crate::{
     BlockDevice, Error,
-    filesystem::{Addr, Addressable, SerdeLen, Serializable, block::Block, layouts::Layout},
-    io::Writer,
+    filesystem::{
+        Addr, Addressable, Deserializable, SerdeLen, Serializable, block::Block, layouts::Layout,
+    },
+    io::{Reader, Writer},
 };
 
 pub fn store<D, T>(device: &mut D, logical_addr: Addr, object: &T) -> Result<(), Error>
@@ -35,6 +37,34 @@ where
     for (i, chunk) in data.chunks(Block::LEN).enumerate() {
         let addr = block_addrs[i];
         device.write(Layout::DATA.nth(addr), chunk)?;
+    }
+    Ok(())
+}
+
+pub fn load<D, T>(device: &mut D, logical_addr: Addr) -> Result<T, Error>
+where
+    D: BlockDevice,
+    T: Addressable + SerdeLen + Deserializable<T>,
+{
+    assert!(T::SERDE_BLOCK_COUNT <= 3, "nothing should serialize to more than 3 blocks");
+    let mut buffer = [0u8; Block::LEN * 3];
+    let start_sector = T::LAYOUT.nth(logical_addr);
+    for (i, chunk) in buffer.chunks_mut(Block::LEN).take(T::SERDE_BLOCK_COUNT).enumerate() {
+        device.read(start_sector + i as Addr, chunk)?;
+    }
+    let mut reader = Reader::new(&buffer);
+    T::deserialize(&mut reader)
+}
+
+pub fn erase<D, T>(device: &mut D, logical_addr: Addr) -> Result<(), Error>
+where
+    D: BlockDevice,
+    T: Addressable + SerdeLen,
+{
+    let buf = [0u8; Block::LEN];
+    let begin = T::LAYOUT.nth(logical_addr);
+    for i in 0..T::SERDE_BLOCK_COUNT {
+        device.write(begin + i as Addr, &buf)?;
     }
     Ok(())
 }

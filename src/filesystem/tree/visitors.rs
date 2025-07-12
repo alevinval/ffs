@@ -1,6 +1,6 @@
 use crate::{
     BlockDevice, Error,
-    filesystem::{Addr, TreeNode, tree::entry::Kind},
+    filesystem::{Addr, TreeNode, storage, tree::entry::Kind},
 };
 
 pub trait Visitor {
@@ -12,11 +12,11 @@ pub trait Visitor {
         addr: Addr,
         depth: usize,
     ) -> Result<(), Error> {
-        let current_node = TreeNode::load(device, addr)?;
-        for entry in current_node.iter_entries().filter(|entry| entry.is_dir()) {
+        let node: TreeNode = storage::load(device, addr)?;
+        for entry in node.iter_entries().filter(|entry| entry.is_dir()) {
             self.walk_tree(device, entry.addr(), depth + 1)?;
         }
-        self.visit(&current_node, depth)?;
+        self.visit(&node, depth)?;
         Ok(())
     }
 

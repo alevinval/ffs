@@ -89,11 +89,7 @@ impl Deserializable<Self> for Meta {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        filesystem::{LoadFrom, storage},
-        test_serde_symmetry,
-        test_utils::MockDevice,
-    };
+    use crate::{filesystem::storage, test_serde_symmetry, test_utils::MockDevice};
 
     use super::*;
 
@@ -104,6 +100,6 @@ mod tests {
         let mut device = MockDevice::new();
         let expected = Meta::new();
         assert_eq!(Ok(()), storage::store(&mut device, 0, &expected));
-        assert_eq!(Ok(expected), Meta::load_from(&mut device, 0));
+        assert_eq!(Ok(expected), storage::load(&mut device, 0));
     }
 }

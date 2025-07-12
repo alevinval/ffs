@@ -2,7 +2,7 @@ use core::fmt;
 
 use crate::{
     BlockDevice, Error,
-    filesystem::{Addr, TreeNode, tree},
+    filesystem::{Addr, TreeNode, storage, tree},
 };
 
 pub fn print_to<D, W>(
@@ -54,7 +54,7 @@ fn print_in_order<D: BlockDevice, W: fmt::Write>(
             out.write_str("../\n")?;
         }
     }
-    let node = TreeNode::load(device, addr)?;
+    let node: TreeNode = storage::load(device, addr)?;
     for entry in node.iter_entries().filter(|entry| entry.is_dir()) {
         out.write_fmt(format_args!("{}{}/\n", "  ".repeat(depth + 1), entry.name().as_str()))?;
         print_in_order(device, entry.addr(), max_depth, depth + 1, out)?;
