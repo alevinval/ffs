@@ -3,7 +3,7 @@ use core::fmt;
 use crate::{
     BlockDevice, Error,
     filesystem::{
-        Layout,
+        Layout, TreeNode,
         allocator::{Allocator, DataAllocator},
         cache::BlockCache,
         data_reader::DataReader,
@@ -73,7 +73,7 @@ where
     pub fn delete(&mut self, file_path: &str) -> Result<(), Error> {
         paths::validate(file_path)?;
 
-        let entry = Tree::get_file(&mut self.device, file_path)?;
+        let entry = Tree::find_file(&mut self.device, file_path)?;
         let node: Node = storage::load(&mut self.device, entry.addr())?;
         storage::erase::<_, Node>(&mut self.device, entry.addr())?;
         storage::erase::<_, File>(&mut self.device, entry.addr())?;
@@ -88,9 +88,13 @@ where
     pub fn open(&mut self, file_path: &str) -> Result<DataReader<D>, Error> {
         paths::validate(file_path)?;
 
-        let entry = Tree::get_file(&mut self.device, file_path)?;
+        let entry = Tree::find_file(&mut self.device, file_path)?;
         let node: Node = storage::load(&mut self.device, entry.addr())?;
         Ok(DataReader::new(&mut self.device, node))
+    }
+
+    pub fn find_node(&mut self, path: &str) -> Result<TreeNode, Error> {
+        Tree::find_node(&mut self.device, path)
     }
 
     pub fn count_files(&mut self) -> Result<usize, Error> {

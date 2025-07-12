@@ -50,13 +50,20 @@ impl Tree {
         })
     }
 
-    pub fn get_file<D>(device: &mut D, file_path: &str) -> Result<Entry, Error>
+    pub fn find_file<D>(device: &mut D, file_path: &str) -> Result<Entry, Error>
     where
         D: BlockDevice,
     {
         find_and_then(device, file_path, 0, |_device, _addr, parent, pos| {
             Ok(parent.get(pos).clone())
         })
+    }
+
+    pub fn find_node<D>(device: &mut D, path: &str) -> Result<TreeNode, Error>
+    where
+        D: BlockDevice,
+    {
+        find_and_then(device, path, 0, |_device, _addr, parent, _pos| Ok(parent.clone()))
     }
 
     pub fn prune<D>(device: &mut D, allocator: &mut Allocator, addr: Addr) -> Result<bool, Error>
@@ -241,14 +248,14 @@ mod tests {
         printer::print(&mut device, "", 0).unwrap();
         assert_eq!(3, Tree::count_dirs(&mut device).unwrap());
 
-        let _ = Tree::get_file(&mut device, "dir/second/third/file.txt").unwrap();
+        let _ = Tree::find_file(&mut device, "dir/second/third/file.txt").unwrap();
         Tree::remove_file(&mut device, "/dir/second/third/file.txt").unwrap();
         println!("tree after removal:");
         printer::print(&mut device, "", 0).unwrap();
 
         assert_eq!(
             Error::FileNotFound,
-            Tree::get_file(&mut device, "/dir/second/third/file.txt").unwrap_err()
+            Tree::find_file(&mut device, "/dir/second/third/file.txt").unwrap_err()
         );
 
         assert_eq!(Ok(false), Tree::prune(&mut device, &mut allocator, 0));
