@@ -69,26 +69,13 @@ fn print_in_order<D: BlockDevice, W: fmt::Write>(
 mod tests {
     use std::string::String;
 
-    use crate::{
-        disk::MemoryDisk,
-        filesystem::{SerdeLen, allocator::Allocator, layouts::Layout, tree::Tree},
-    };
+    use crate::filesystem::tree::{Tree, tests::setup_tree};
 
     use super::*;
 
-    fn prepare() -> (MemoryDisk, Allocator) {
-        let mut device =
-            MemoryDisk::new(512, TEST_LAYOUT.entries_count() as usize * TreeNode::SERDE_LEN);
-        let mut allocator = Allocator::new(TEST_LAYOUT);
-        Tree::format(&mut device, &mut allocator).expect("failed to format device");
-        (device, allocator)
-    }
-
-    const TEST_LAYOUT: Layout = Layout::new(0, 10);
-
     #[test]
     fn test_print_tree() {
-        let (mut device, mut allocator) = prepare();
+        let (mut device, mut allocator) = setup_tree();
 
         let mut actual = String::new();
         assert_eq!(Ok(()), print_to(&mut device, "", 0, &mut actual));
@@ -112,7 +99,7 @@ mod tests {
 
     #[test]
     fn test_print_tree_relative() {
-        let (mut device, mut allocator) = prepare();
+        let (mut device, mut allocator) = setup_tree();
 
         let mut actual = String::new();
         assert_eq!(Ok(()), print_to(&mut device, "", 0, &mut actual));
@@ -130,7 +117,7 @@ mod tests {
 
     #[test]
     fn test_print_tree_relative_and_max_depth() {
-        let (mut device, mut allocator) = prepare();
+        let (mut device, mut allocator) = setup_tree();
 
         let mut actual = String::new();
         assert_eq!(Ok(()), print_to(&mut device, "", 0, &mut actual));
@@ -155,7 +142,7 @@ mod tests {
 
     #[test]
     fn test_print_file_fails() {
-        let (mut device, mut allocator) = prepare();
+        let (mut device, mut allocator) = setup_tree();
 
         let mut actual = String::new();
         assert_eq!(Ok(()), print_to(&mut device, "", 0, &mut actual));

@@ -1,4 +1,6 @@
-use crate::filesystem::{Addr, SerdeLen, allocator::Bitmap, node::Node, tree::TreeNode};
+use crate::filesystem::{
+    Addr, SerdeLen, allocator::Bitmap, block::Block, node::Node, tree::TreeNode,
+};
 
 const N_TREE: usize = 100;
 const N_FILE: usize = N_TREE * TreeNode::LEN;
@@ -15,11 +17,11 @@ pub struct Layout {
 impl Layout {
     pub const META: Self = Self::new(0, 1);
     pub const TREE_BITMAP: Self = next(Self::META, 1, 1);
-    pub const TREE: Self = next(Self::TREE_BITMAP, N_TREE, TreeNode::SERDE_BLOCK_COUNT);
+    pub const DATA_BITMAP: Self = next(Self::TREE_BITMAP, N_FREE, 1);
+    pub const TREE: Self = next(Self::DATA_BITMAP, N_TREE, TreeNode::SERDE_BLOCK_COUNT);
     pub const FILE: Self = next(Self::TREE, N_FILE, 1);
     pub const NODE: Self = next(Self::FILE, N_FILE, 1);
-    pub const DATA_BITMAP: Self = next(Self::NODE, N_FREE, 1);
-    pub const DATA: Self = next(Self::DATA_BITMAP, N_DATA, 1);
+    pub const DATA: Self = next(Self::NODE, N_DATA, 1);
 
     pub const fn new(begin: Addr, capacity: Addr) -> Self {
         Self::new_with_size(begin, capacity, 1)
@@ -59,6 +61,10 @@ impl Layout {
     pub const fn iter_sectors(&self) -> core::ops::Range<Addr> {
         self.begin..self.end
     }
+
+    pub const fn size_in_bytes(&self) -> usize {
+        self.sector_count() as usize * Block::LEN
+    }
 }
 
 const fn next(prev: Layout, capacity: usize, entry_size: usize) -> Layout {
@@ -69,13 +75,21 @@ const fn next(prev: Layout, capacity: usize, entry_size: usize) -> Layout {
 pub fn print() {
     use std::println;
     println!("Disk layout:");
-    println!("  Meta: {:?}", Layout::META);
-    println!("  TreeBitmap: {:?}", Layout::TREE_BITMAP);
-    println!("  Tree: {:?}", Layout::TREE);
-    println!("  File: {:?}", Layout::FILE);
-    println!("  Node: {:?}", Layout::NODE);
-    println!("  DataBitmap: {:?}", Layout::DATA_BITMAP);
-    println!("  Data: {:?}", Layout::DATA);
+    println!("  Meta: {:?} ({} bytes)", Layout::META, Layout::META.size_in_bytes());
+    println!(
+        "  TreeBitmap: {:?} ({} bytes)",
+        Layout::TREE_BITMAP,
+        Layout::TREE_BITMAP.size_in_bytes()
+    );
+    println!(
+        "  DataBitmap: {:?} ({} bytes)",
+        Layout::DATA_BITMAP,
+        Layout::DATA_BITMAP.size_in_bytes()
+    );
+    println!("  Tree: {:?} ({} bytes)", Layout::TREE, Layout::TREE.size_in_bytes());
+    println!("  File: {:?} ({} bytes)", Layout::FILE, Layout::FILE.size_in_bytes());
+    println!("  Node: {:?} ({} bytes)", Layout::NODE, Layout::NODE.size_in_bytes());
+    println!("  Data: {:?} ({} bytes)", Layout::DATA, Layout::DATA.size_in_bytes());
     println!();
 }
 
@@ -91,11 +105,11 @@ mod tests {
     #[test]
     fn layout_ranges_are_continuous() {
         assert_continuous_layout_range(Layout::META, Layout::TREE_BITMAP);
-        assert_continuous_layout_range(Layout::TREE_BITMAP, Layout::TREE);
+        assert_continuous_layout_range(Layout::TREE_BITMAP, Layout::DATA_BITMAP);
+        assert_continuous_layout_range(Layout::DATA_BITMAP, Layout::TREE);
         assert_continuous_layout_range(Layout::TREE, Layout::FILE);
         assert_continuous_layout_range(Layout::FILE, Layout::NODE);
-        assert_continuous_layout_range(Layout::NODE, Layout::DATA_BITMAP);
-        assert_continuous_layout_range(Layout::DATA_BITMAP, Layout::DATA);
+        assert_continuous_layout_range(Layout::NODE, Layout::DATA);
     }
 
     #[test]
@@ -145,6 +159,15 @@ mod tests {
     #[should_panic(expected = "Address out of range")]
     fn nth_out_of_bounds() {
         Layout::new(0, 10).nth(10);
+    }
+
+    #[test]
+    fn test_size_in_bytes() {
+        let sut = Layout::new(0, 10);
+        assert_eq!(sut.size_in_bytes(), 10 * Block::LEN);
+
+        let sut = Layout::new_with_size(0, 10, 2);
+        assert_eq!(sut.size_in_bytes(), 10 * Block::LEN * 2);
     }
 
     mod with_size {

@@ -181,12 +181,13 @@ mod tests {
 
     use super::*;
 
-    const TEST_LAYOUT: Layout = Layout::new(0, 10);
+    const TREE_BITMAP: Layout = Layout::new(0, 1);
+    const TREE_LAYOUT: Layout = Layout::new_with_size(0, 10, TreeNode::SERDE_BLOCK_COUNT as u32);
 
-    fn prepare() -> (MemoryDisk, Allocator) {
+    pub(super) fn setup_tree() -> (MemoryDisk, Allocator) {
         let mut device =
-            MemoryDisk::new(512, TEST_LAYOUT.entries_count() as usize * TreeNode::SERDE_LEN);
-        let mut allocator = Allocator::new(TEST_LAYOUT);
+            MemoryDisk::new(512, TREE_LAYOUT.size_in_bytes() + TREE_BITMAP.size_in_bytes());
+        let mut allocator = Allocator::new(TREE_LAYOUT);
         Tree::format(&mut device, &mut allocator).expect("failed to format device");
         (device, allocator)
     }
@@ -203,13 +204,13 @@ mod tests {
 
     #[test]
     fn test_find_addr_for_path_root() {
-        let (mut device, _) = prepare();
+        let (mut device, _) = setup_tree();
         assert_eq!(Ok(0), find_entry_addr(&mut device, "", 0));
     }
 
     #[test]
     fn test_find_addr_for_path_missing() {
-        let (mut device, _) = prepare();
+        let (mut device, _) = setup_tree();
         assert_eq!(
             Err(Error::FileNotFound),
             find_entry_addr(&mut device, "missing/path/file.txt", 0)
@@ -218,7 +219,7 @@ mod tests {
 
     #[test]
     fn test_find_addr_for_path_found() {
-        let (mut device, mut allocator) = prepare();
+        let (mut device, mut allocator) = setup_tree();
         Tree::insert_file(&mut device, &mut allocator, "some/path/file.txt")
             .expect("cannot insert file");
         assert_eq!(Ok(0), find_entry_addr(&mut device, "", 0));
@@ -229,7 +230,7 @@ mod tests {
 
     #[test]
     fn multiple_tree_ops() {
-        let (mut device, mut allocator) = prepare();
+        let (mut device, mut allocator) = setup_tree();
         println!("tree before insertion:");
         printer::print(&mut device, "", 0).unwrap();
         assert_eq!(0, Tree::count_dirs(&mut device).unwrap());
