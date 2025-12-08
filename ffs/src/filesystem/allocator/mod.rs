@@ -82,11 +82,11 @@ impl Allocator {
             device.read(sector, &mut block)?;
             let mut bitmap = Bitmap::deserialize(&mut block.reader())?;
 
-            if let Some(allocation) = bitmap.allocate() {
+            if let Some(bitmap_addr) = bitmap.take() {
                 bitmap.serialize(&mut block.writer())?;
                 device.write(sector, &block)?;
                 self.last_accessed = addr;
-                return Ok(to_addr(addr, allocation));
+                return Ok(to_addr(addr, bitmap_addr));
             }
         }
         Err(Error::StorageFull)
