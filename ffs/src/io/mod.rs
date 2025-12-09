@@ -21,6 +21,9 @@ impl fmt::Write for StdoutFmtWriter {
 pub enum Error {
     /// The provided buffer is too small to fit the expected data.
     BufferTooSmall { expected: usize, found: usize },
+
+    /// An underlying I/O error occurred.
+    IO { io: std::io::Error },
 }
 
 /// Trait `Write` writes data to a destination.

@@ -58,6 +58,7 @@ impl From<io::Error> for Error {
             io::Error::BufferTooSmall { expected, found } => {
                 Self::BufferTooSmall { expected, found }
             }
+            io::Error::IO { io: _ } => Self::UnsupportedDevice,
         }
     }
 }
