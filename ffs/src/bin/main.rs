@@ -1,4 +1,4 @@
-use ffs::{BlockDevice, Controller, disk::MemoryDisk};
+use ffs::{BlockDevice, Controller, disk::Device};
 
 fn ls_tree<D>(ctrl: &mut Controller<D>, base_path: &str, depth: usize)
 where
@@ -52,18 +52,23 @@ Montes nascetur ridiculus mus donec rhoncus eros lobortis. Maximus eget fermentu
 Vestibulum fusce dictum risus blandit quis suspendisse aliquet. Ante condimentum neque at luctus nibh finibus facilisis.
 Ligula congue sollicitudin erat viverra ac tincidunt nam. Euismod quam justo lectus commodo augue arcu dignissim.";
 
-    let sdcard = MemoryDisk::load_from_file(512, "sdcard.img").map_or_else(
-        |_| {
-            println!("Formatting sdcard...");
-            let mut disk = MemoryDisk::new(512, 8 * 1024 * 1024);
-            Controller::format(&mut disk).expect("failed to format SD card");
-            disk
-        },
-        |disk| {
-            println!("Loaded sdcard.img");
-            disk
-        },
-    );
+    // let sdcard = MemoryDisk::load_from_file(512, "sdcard.img").map_or_else(
+    //     |_| {
+    //         println!("Formatting sdcard...");
+    //         let mut disk = MemoryDisk::new(512, 8 * 1024 * 1024);
+    //         Controller::format(&mut disk).expect("failed to format SD card");
+    //         disk
+    //     },
+    //     |disk| {
+    //         println!("Loaded sdcard.img");
+    //         disk
+    //     },
+    // );
+
+    let sdcard = Device::new("/dev/sdb").expect("cannot open device");
+
+    // Controller::format(&mut sdcard).expect("failed to format SD card");
+    // println!("partitioned!");
 
     let mut ctrl = Controller::mount(sdcard).expect("failed to read metadata");
     ctrl.print_disk_layout();
@@ -99,5 +104,5 @@ Ligula congue sollicitudin erat viverra ac tincidunt nam. Euismod quam justo lec
     ls_tree(&mut ctrl, "dirC/first/", 1);
 
     let sdcard = ctrl.unmount();
-    sdcard.persist_to_file("sdcard.img").expect("Failed to persist SD card image");
+    // sdcard.persist_to_file("sdcard.img").expect("Failed to persist SD card image");
 }
