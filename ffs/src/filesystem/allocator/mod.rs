@@ -101,7 +101,7 @@ impl Allocator {
     /// - Safe to call multiple times on the same address, though redundant calls may have no effect.
     /// - May adjust `self.last_accessed` to improve future allocation locality.
     pub fn release<D: BlockDevice>(&mut self, device: &mut D, addr: Addr) -> Result<(), Error> {
-        let bitmap_addr = to_bitmap_addr(addr) as Addr;
+        let bitmap_addr = to_bitmap_addr(addr);
         let bitmap_sector = self.layout.nth(bitmap_addr);
         let bitmap_offset = to_bitmap_offset(addr);
 
