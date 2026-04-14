@@ -32,7 +32,8 @@ trait SerdeLen {
     /// Fixed length of the serialized type.
     const BYTES_LEN: usize;
 
-    const SERDE_BLOCK_COUNT: usize = Self::BYTES_LEN.div_ceil(Block::LEN);
+    /// Number of blocks required to store the type.
+    const BLOCKS_LEN: usize = Self::BYTES_LEN.div_ceil(Block::LEN);
 }
 
 pub trait Serializable {

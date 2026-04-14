@@ -182,7 +182,7 @@ mod tests {
     use super::*;
 
     const TREE_BITMAP: Layout = Layout::new(0, 1);
-    const TREE_LAYOUT: Layout = Layout::new_with_size(0, 10, TreeNode::SERDE_BLOCK_COUNT as u32);
+    const TREE_LAYOUT: Layout = Layout::new_with_size(0, 10, TreeNode::BLOCKS_LEN as u32);
 
     pub(super) fn setup_tree() -> (MemoryDisk, Allocator) {
         let mut device =

@@ -18,7 +18,7 @@ impl Layout {
     pub const META: Self = Self::new(0, 1);
     pub const TREE_BITMAP: Self = next(Self::META, 1, 1);
     pub const DATA_BITMAP: Self = next(Self::TREE_BITMAP, N_FREE, 1);
-    pub const TREE: Self = next(Self::DATA_BITMAP, N_TREE, TreeNode::SERDE_BLOCK_COUNT);
+    pub const TREE: Self = next(Self::DATA_BITMAP, N_TREE, TreeNode::BLOCKS_LEN);
     pub const FILE: Self = next(Self::TREE, N_FILE, 1);
     pub const NODE: Self = next(Self::FILE, N_FILE, 1);
     pub const DATA: Self = next(Self::NODE, N_DATA, 1);

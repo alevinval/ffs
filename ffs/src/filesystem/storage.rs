@@ -11,13 +11,13 @@ where
     D: BlockDevice,
     T: Addressable + Serializable + SerdeLen,
 {
-    assert!(T::SERDE_BLOCK_COUNT <= 3, "nothing should serialize to more than 3 blocks");
+    assert!(T::BLOCKS_LEN <= 3, "nothing should serialize to more than 3 blocks");
     let mut buf = [0u8; Block::LEN * 3];
     let mut writer = Writer::new(&mut buf);
     object.serialize(&mut writer)?;
 
     let addr = T::LAYOUT.nth(logical_addr);
-    for (i, chunk) in buf.chunks(Block::LEN).take(T::SERDE_BLOCK_COUNT).enumerate() {
+    for (i, chunk) in buf.chunks(Block::LEN).take(T::BLOCKS_LEN).enumerate() {
         device.write(addr + i as Addr, chunk)?;
     }
     Ok(())
@@ -46,10 +46,10 @@ where
     D: BlockDevice,
     T: Addressable + SerdeLen + Deserializable<T>,
 {
-    assert!(T::SERDE_BLOCK_COUNT <= 3, "nothing should serialize to more than 3 blocks");
+    assert!(T::BLOCKS_LEN <= 3, "nothing should serialize to more than 3 blocks");
     let mut buffer = [0u8; Block::LEN * 3];
     let start_sector = T::LAYOUT.nth(logical_addr);
-    for (i, chunk) in buffer.chunks_mut(Block::LEN).take(T::SERDE_BLOCK_COUNT).enumerate() {
+    for (i, chunk) in buffer.chunks_mut(Block::LEN).take(T::BLOCKS_LEN).enumerate() {
         device.read(start_sector + i as Addr, chunk)?;
     }
     let mut reader = Reader::new(&buffer);
@@ -63,7 +63,7 @@ where
 {
     let buf = [0u8; Block::LEN];
     let begin = T::LAYOUT.nth(logical_addr);
-    for i in 0..T::SERDE_BLOCK_COUNT {
+    for i in 0..T::BLOCKS_LEN {
         device.write(begin + i as Addr, &buf)?;
     }
     Ok(())
