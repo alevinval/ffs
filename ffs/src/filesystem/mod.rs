@@ -31,7 +31,6 @@ pub type Addr = u32; // Logical address type for sectors/blocks. Change here to 
 trait SerdeLen {
     const SERDE_LEN: usize;
     const SERDE_BLOCK_COUNT: usize = Self::SERDE_LEN.div_ceil(Block::LEN);
-    const SERDE_BUFFER_LEN: usize = Self::SERDE_BLOCK_COUNT * Block::LEN;
 }
 
 pub trait Serializable {
