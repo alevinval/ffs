@@ -103,6 +103,6 @@ Ligula congue sollicitudin erat viverra ac tincidunt nam. Euismod quam justo lec
     ls_tree(&mut ctrl, "dirC", 1);
     ls_tree(&mut ctrl, "dirC/first/", 1);
 
-    let sdcard = ctrl.unmount();
+    let _sdcard = ctrl.unmount();
     // sdcard.persist_to_file("sdcard.img").expect("Failed to persist SD card image");
 }

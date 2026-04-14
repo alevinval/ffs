@@ -85,7 +85,7 @@ where
         Ok(())
     }
 
-    pub fn open(&mut self, file_path: &str) -> Result<DataReader<D>, Error> {
+    pub fn open(&mut self, file_path: &str) -> Result<DataReader<'_, D>, Error> {
         paths::validate(file_path)?;
 
         let entry = Tree::get_file(&mut self.device, file_path)?;

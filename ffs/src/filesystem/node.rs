@@ -7,7 +7,7 @@ use crate::{
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct Node {
     file_len: u16,
-    data_addrs: [Addr; Node::BLOCKS_PER_NODE],
+    data_addrs: [Addr; Self::BLOCKS_PER_NODE],
 }
 
 impl Node {

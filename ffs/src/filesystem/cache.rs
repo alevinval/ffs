@@ -41,7 +41,7 @@ impl<D: BlockDevice, const SIZE: usize> BlockCache<D, SIZE> {
         None
     }
 
-    fn insert(&mut self, sector: Addr, block: Block) {
+    const fn insert(&mut self, sector: Addr, block: Block) {
         self.entries.rotate_right(1);
         self.entries[0] = Some(CacheEntry { sector, block });
     }
