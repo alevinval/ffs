@@ -6,7 +6,7 @@ use crate::{
     io::{Reader, Writer},
 };
 
-pub fn store<D, T>(device: &mut D, logical_addr: Addr, object: &T) -> Result<(), Error>
+pub fn store<D, T>(device: &mut D, logical_address: Addr, object: &T) -> Result<(), Error>
 where
     D: BlockDevice,
     T: Addressable + Serializable + SerdeLen,
@@ -16,9 +16,9 @@ where
     let mut writer = Writer::new(&mut buf);
     object.serialize(&mut writer)?;
 
-    let addr = T::LAYOUT.nth(logical_addr);
-    for (i, chunk) in buf.chunks(Block::LEN).take(T::BLOCKS_LEN).enumerate() {
-        device.write(addr + i as Addr, chunk)?;
+    let sector = T::LAYOUT.nth(logical_address);
+    for (offset, chunk) in buf.chunks(Block::LEN).take(T::BLOCKS_LEN).enumerate() {
+        device.write(sector + offset as Addr, chunk)?;
     }
     Ok(())
 }
@@ -41,30 +41,30 @@ where
     Ok(())
 }
 
-pub fn load<D, T>(device: &mut D, logical_addr: Addr) -> Result<T, Error>
+pub fn load<D, T>(device: &mut D, logical_address: Addr) -> Result<T, Error>
 where
     D: BlockDevice,
     T: Addressable + SerdeLen + Deserializable<T>,
 {
     assert!(T::BLOCKS_LEN <= 3, "nothing should serialize to more than 3 blocks");
     let mut buffer = [0u8; Block::LEN * 3];
-    let start_sector = T::LAYOUT.nth(logical_addr);
-    for (i, chunk) in buffer.chunks_mut(Block::LEN).take(T::BLOCKS_LEN).enumerate() {
-        device.read(start_sector + i as Addr, chunk)?;
+    let sector = T::LAYOUT.nth(logical_address);
+    for (offset, chunk) in buffer.chunks_mut(Block::LEN).take(T::BLOCKS_LEN).enumerate() {
+        device.read(sector + offset as Addr, chunk)?;
     }
     let mut reader = Reader::new(&buffer);
     T::deserialize(&mut reader)
 }
 
-pub fn erase<D, T>(device: &mut D, logical_addr: Addr) -> Result<(), Error>
+pub fn erase<D, T>(device: &mut D, logical_address: Addr) -> Result<(), Error>
 where
     D: BlockDevice,
     T: Addressable + SerdeLen,
 {
-    let buf = [0u8; Block::LEN];
-    let begin = T::LAYOUT.nth(logical_addr);
-    for i in 0..T::BLOCKS_LEN {
-        device.write(begin + i as Addr, &buf)?;
+    let empty_block = Block::new();
+    let sector = T::LAYOUT.nth(logical_address);
+    for offset in 0..T::BLOCKS_LEN {
+        device.write(sector + offset as Addr, &empty_block)?;
     }
     Ok(())
 }
