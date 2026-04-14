@@ -6,18 +6,27 @@ use crate::{
     io::{Reader, Writer},
 };
 
+/// Length of the buffer used to store/load data from the block device.
+///
+/// Must be able to fit the largest structure of the library. At the moment
+/// that's 3 blocks size.
+///
+/// TODO: When Rust supports associated const variables, move to [`SerdeLen`] trait and
+/// have it calculated automatically for each type.
+const BUFFER_LEN: usize = Block::LEN * 3;
+
 pub fn store<D, T>(device: &mut D, logical_address: Addr, object: &T) -> Result<(), Error>
 where
     D: BlockDevice,
     T: Addressable + Serializable + SerdeLen,
 {
     assert!(T::BLOCKS_LEN <= 3, "nothing should serialize to more than 3 blocks");
-    let mut buf = [0u8; Block::LEN * 3];
-    let mut writer = Writer::new(&mut buf);
+    let mut buffer = [0u8; BUFFER_LEN];
+    let mut writer = Writer::new(&mut buffer);
     object.serialize(&mut writer)?;
 
     let sector = T::LAYOUT.nth(logical_address);
-    for (offset, chunk) in buf.chunks(Block::LEN).take(T::BLOCKS_LEN).enumerate() {
+    for (offset, chunk) in buffer.chunks(Block::LEN).take(T::BLOCKS_LEN).enumerate() {
         device.write(sector + offset as Addr, chunk)?;
     }
     Ok(())
@@ -47,7 +56,7 @@ where
     T: Addressable + SerdeLen + Deserializable<T>,
 {
     assert!(T::BLOCKS_LEN <= 3, "nothing should serialize to more than 3 blocks");
-    let mut buffer = [0u8; Block::LEN * 3];
+    let mut buffer = [0u8; BUFFER_LEN];
     let sector = T::LAYOUT.nth(logical_address);
     for (offset, chunk) in buffer.chunks_mut(Block::LEN).take(T::BLOCKS_LEN).enumerate() {
         device.read(sector + offset as Addr, chunk)?;
