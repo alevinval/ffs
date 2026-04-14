@@ -36,11 +36,11 @@ pub trait FixedLen {
     const BLOCKS_LEN: usize = Self::BYTES_LEN.div_ceil(Block::LEN);
 }
 
-pub trait Serializable {
+pub trait Serializable: FixedLen {
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<usize, Error>;
 }
 
-pub trait Deserializable<T>
+pub trait Deserializable<T>: FixedLen
 where
     T: Sized,
 {
