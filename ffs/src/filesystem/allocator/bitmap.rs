@@ -1,6 +1,6 @@
 use crate::{
     Error,
-    filesystem::{Addr, Block, Deserializable, SerdeLen, Serializable},
+    filesystem::{Addr, Block, Deserializable, FixedLen, Serializable},
     io::{Read, Write},
 };
 
@@ -74,7 +74,7 @@ impl Bitmap {
     }
 }
 
-impl SerdeLen for Bitmap {
+impl FixedLen for Bitmap {
     const BYTES_LEN: usize = Block::LEN;
 }
 

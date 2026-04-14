@@ -1,6 +1,6 @@
 use crate::{
     Error,
-    filesystem::{Addr, Addressable, Deserializable, Layout, Name, SerdeLen, Serializable},
+    filesystem::{Addr, Addressable, Deserializable, FixedLen, Layout, Name, Serializable},
     io::{Read, Write},
 };
 
@@ -24,7 +24,7 @@ impl Addressable for File {
     const LAYOUT: Layout = Layout::FILE;
 }
 
-impl SerdeLen for File {
+impl FixedLen for File {
     const BYTES_LEN: usize = 4 + Name::BYTES_LEN;
 }
 

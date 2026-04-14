@@ -28,7 +28,7 @@ mod tree;
 pub type Addr = u32; // Logical address type for sectors/blocks. Change here to update everywhere.
 
 /// Trait for types that have a constant length when serialized/deserialized.
-pub trait SerdeLen {
+pub trait FixedLen {
     /// Fixed length of the serialized type.
     const BYTES_LEN: usize;
 

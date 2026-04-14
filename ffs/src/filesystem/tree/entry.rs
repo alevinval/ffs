@@ -1,6 +1,6 @@
 use crate::{
     Error,
-    filesystem::{Addr, Deserializable, Name, SerdeLen, Serializable},
+    filesystem::{Addr, Deserializable, FixedLen, Name, Serializable},
     io::{Read, Write},
 };
 
@@ -41,7 +41,7 @@ impl Entry {
     }
 }
 
-impl SerdeLen for Entry {
+impl FixedLen for Entry {
     const BYTES_LEN: usize = Name::BYTES_LEN + size_of::<Addr>() + Kind::BYTES_LEN;
 }
 
@@ -69,7 +69,7 @@ pub enum Kind {
     Dir,
 }
 
-impl SerdeLen for Kind {
+impl FixedLen for Kind {
     const BYTES_LEN: usize = 1;
 }
 

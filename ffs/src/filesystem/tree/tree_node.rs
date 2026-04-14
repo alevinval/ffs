@@ -1,7 +1,7 @@
 use crate::{
     Error,
     filesystem::{
-        Addr, Addressable, Deserializable, Layout, Name, SerdeLen, Serializable,
+        Addr, Addressable, Deserializable, FixedLen, Layout, Name, Serializable,
         tree::entry::{Entry, Kind},
     },
     io::{Read, Write},
@@ -91,7 +91,7 @@ impl Addressable for TreeNode {
     const LAYOUT: Layout = Layout::TREE;
 }
 
-impl SerdeLen for TreeNode {
+impl FixedLen for TreeNode {
     const BYTES_LEN: usize = Self::LEN * Entry::BYTES_LEN;
 }
 

@@ -1,7 +1,7 @@
 use crate::{
     BlockDevice, Error,
     filesystem::{
-        Addr, Addressable, Deserializable, SerdeLen, Serializable, block::Block, layouts::Layout,
+        Addr, Addressable, Deserializable, FixedLen, Serializable, block::Block, layouts::Layout,
     },
     io::{Reader, Writer},
 };
@@ -18,7 +18,7 @@ const BUFFER_LEN: usize = Block::LEN * 3;
 pub fn store<D, T>(device: &mut D, logical_address: Addr, object: &T) -> Result<(), Error>
 where
     D: BlockDevice,
-    T: Addressable + Serializable + SerdeLen,
+    T: Addressable + Serializable + FixedLen,
 {
     assert!(T::BLOCKS_LEN <= 3, "nothing should serialize to more than 3 blocks");
     let mut buffer = [0u8; BUFFER_LEN];
@@ -53,7 +53,7 @@ where
 pub fn load<D, T>(device: &mut D, logical_address: Addr) -> Result<T, Error>
 where
     D: BlockDevice,
-    T: Addressable + SerdeLen + Deserializable<T>,
+    T: Addressable + FixedLen + Deserializable<T>,
 {
     assert!(T::BLOCKS_LEN <= 3, "nothing should serialize to more than 3 blocks");
     let mut buffer = [0u8; BUFFER_LEN];
@@ -68,7 +68,7 @@ where
 pub fn erase<D, T>(device: &mut D, logical_address: Addr) -> Result<(), Error>
 where
     D: BlockDevice,
-    T: Addressable + SerdeLen,
+    T: Addressable + FixedLen,
 {
     let empty_block = Block::new();
     let sector = T::LAYOUT.nth(logical_address);

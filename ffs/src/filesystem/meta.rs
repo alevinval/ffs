@@ -1,5 +1,5 @@
 use crate::{
-    filesystem::{Addr, Addressable, Block, Deserializable, Error, Layout, SerdeLen, Serializable},
+    filesystem::{Addr, Addressable, Block, Deserializable, Error, FixedLen, Layout, Serializable},
     io::{Read, Write},
 };
 
@@ -42,7 +42,7 @@ impl Addressable for Meta {
     const LAYOUT: Layout = Layout::META;
 }
 
-impl SerdeLen for Meta {
+impl FixedLen for Meta {
     const BYTES_LEN: usize = Block::LEN;
 }
 

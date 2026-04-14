@@ -1,5 +1,5 @@
 use crate::filesystem::{
-    Addr, SerdeLen, allocator::Bitmap, block::Block, node::Node, tree::TreeNode,
+    Addr, FixedLen, allocator::Bitmap, block::Block, node::Node, tree::TreeNode,
 };
 
 const N_TREE: usize = 100;

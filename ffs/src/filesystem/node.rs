@@ -1,6 +1,6 @@
 use crate::{
     Error,
-    filesystem::{Addr, Addressable, Block, Deserializable, Layout, SerdeLen, Serializable},
+    filesystem::{Addr, Addressable, Block, Deserializable, FixedLen, Layout, Serializable},
     io::{Read, Write},
 };
 
@@ -39,7 +39,7 @@ impl Addressable for Node {
     const LAYOUT: Layout = Layout::NODE;
 }
 
-impl SerdeLen for Node {
+impl FixedLen for Node {
     const BYTES_LEN: usize = 2 + (size_of::<Addr>() * Self::BLOCKS_PER_NODE);
 }
 

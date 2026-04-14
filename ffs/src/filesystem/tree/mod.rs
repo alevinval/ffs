@@ -176,7 +176,7 @@ mod tests {
 
     use crate::{
         disk::MemoryDisk,
-        filesystem::{SerdeLen, layouts::Layout, tree::printer},
+        filesystem::{FixedLen, layouts::Layout, tree::printer},
     };
 
     use super::*;

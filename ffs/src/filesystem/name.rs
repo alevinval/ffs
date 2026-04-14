@@ -7,7 +7,7 @@
 
 use crate::{
     Error,
-    filesystem::{Deserializable, SerdeLen, Serializable, paths},
+    filesystem::{Deserializable, FixedLen, Serializable, paths},
     io::{Read, Write},
 };
 
@@ -52,7 +52,7 @@ impl Name {
     }
 }
 
-impl SerdeLen for Name {
+impl FixedLen for Name {
     const BYTES_LEN: usize = Self::LEN + 1;
 }
 
