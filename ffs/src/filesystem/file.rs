@@ -25,7 +25,7 @@ impl Addressable for File {
 }
 
 impl SerdeLen for File {
-    const SERDE_LEN: usize = 4 + Name::SERDE_LEN;
+    const BYTES_LEN: usize = 4 + Name::BYTES_LEN;
 }
 
 impl Serializable for File {

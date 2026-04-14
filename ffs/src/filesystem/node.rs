@@ -40,7 +40,7 @@ impl Addressable for Node {
 }
 
 impl SerdeLen for Node {
-    const SERDE_LEN: usize = 2 + (size_of::<Addr>() * Self::BLOCKS_PER_NODE);
+    const BYTES_LEN: usize = 2 + (size_of::<Addr>() * Self::BLOCKS_PER_NODE);
 }
 
 impl Serializable for Node {

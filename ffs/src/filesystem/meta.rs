@@ -43,7 +43,7 @@ impl Addressable for Meta {
 }
 
 impl SerdeLen for Meta {
-    const SERDE_LEN: usize = Block::LEN;
+    const BYTES_LEN: usize = Block::LEN;
 }
 
 impl Serializable for Meta {

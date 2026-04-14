@@ -53,7 +53,7 @@ impl Name {
 }
 
 impl SerdeLen for Name {
-    const SERDE_LEN: usize = Self::LEN + 1;
+    const BYTES_LEN: usize = Self::LEN + 1;
 }
 
 impl Serializable for Name {

@@ -29,8 +29,10 @@ pub type Addr = u32; // Logical address type for sectors/blocks. Change here to 
 
 /// Trait for types that have a constant length when serialized/deserialized.
 trait SerdeLen {
-    const SERDE_LEN: usize;
-    const SERDE_BLOCK_COUNT: usize = Self::SERDE_LEN.div_ceil(Block::LEN);
+    /// Fixed length of the serialized type.
+    const BYTES_LEN: usize;
+
+    const SERDE_BLOCK_COUNT: usize = Self::BYTES_LEN.div_ceil(Block::LEN);
 }
 
 pub trait Serializable {

@@ -75,7 +75,7 @@ impl Bitmap {
 }
 
 impl SerdeLen for Bitmap {
-    const SERDE_LEN: usize = Block::LEN;
+    const BYTES_LEN: usize = Block::LEN;
 }
 
 impl Serializable for Bitmap {

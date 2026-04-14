@@ -42,7 +42,7 @@ impl Entry {
 }
 
 impl SerdeLen for Entry {
-    const SERDE_LEN: usize = Name::SERDE_LEN + size_of::<Addr>() + Kind::SERDE_LEN;
+    const BYTES_LEN: usize = Name::BYTES_LEN + size_of::<Addr>() + Kind::BYTES_LEN;
 }
 
 impl Serializable for Entry {
@@ -70,7 +70,7 @@ pub enum Kind {
 }
 
 impl SerdeLen for Kind {
-    const SERDE_LEN: usize = 1;
+    const BYTES_LEN: usize = 1;
 }
 
 impl Serializable for Kind {

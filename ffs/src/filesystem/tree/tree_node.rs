@@ -92,7 +92,7 @@ impl Addressable for TreeNode {
 }
 
 impl SerdeLen for TreeNode {
-    const SERDE_LEN: usize = Self::LEN * Entry::SERDE_LEN;
+    const BYTES_LEN: usize = Self::LEN * Entry::BYTES_LEN;
 }
 
 impl Serializable for TreeNode {
