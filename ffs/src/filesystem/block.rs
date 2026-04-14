@@ -23,10 +23,6 @@ impl Block {
         block
     }
 
-    pub const fn bytes_mut(&mut self) -> &mut [u8] {
-        &mut self.inner
-    }
-
     pub const fn writer(&mut self) -> Writer<'_> {
         Writer::new(&mut self.inner)
     }
