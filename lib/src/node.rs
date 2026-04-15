@@ -1,7 +1,7 @@
 use crate::{
-    Addr, Addressable, Block, Deserializable, Error, FixedLen, Serializable,
+    Addr, Block, Deserializable, DeviceAddr, Error, FixedLen, Serializable,
+    device_layout::DeviceLayout,
     io::{Read, Write},
-    layouts::Layout,
 };
 
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -39,8 +39,8 @@ impl Node {
     }
 }
 
-impl Addressable for Node {
-    const LAYOUT: Layout = Layout::NODE;
+impl DeviceAddr for Node {
+    const LAYOUT: DeviceLayout = DeviceLayout::NODE;
 }
 
 impl FixedLen for Node {

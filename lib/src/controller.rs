@@ -5,8 +5,8 @@ use crate::{
     allocator::{Allocator, DataAllocator},
     block_cache::BlockCache,
     data_reader::DataReader,
+    device_layout::DeviceLayout,
     file::File,
-    layouts::Layout,
     meta::Meta,
     node::Node,
     paths, storage,
@@ -33,8 +33,8 @@ where
             return Err(Error::UnsupportedDevice);
         }
         let device = BlockCache::mount(device);
-        let data_allocator = Allocator::new(Layout::DATA_BITMAP);
-        let tree_allocator = Allocator::new(Layout::TREE_BITMAP);
+        let data_allocator = Allocator::new(DeviceLayout::DATA_BITMAP);
+        let tree_allocator = Allocator::new(DeviceLayout::TREE_BITMAP);
         Ok(Self { device, data_allocator, tree_allocator })
     }
 
@@ -44,7 +44,7 @@ where
 
     pub fn format(device: &mut D) -> Result<(), Error> {
         storage::store(device, 0, &Meta::new())?;
-        Tree::format(device, &mut Allocator::new(Layout::TREE_BITMAP))?;
+        Tree::format(device, &mut Allocator::new(DeviceLayout::TREE_BITMAP))?;
         Ok(())
     }
 
@@ -119,7 +119,7 @@ where
 
     #[cfg(feature = "std")]
     pub fn print_disk_layout(&self) {
-        use crate::layouts;
-        layouts::print();
+        use crate::device_layout;
+        device_layout::print();
     }
 }

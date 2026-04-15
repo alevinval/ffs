@@ -13,8 +13,8 @@ pub use error::Error;
 
 use crate::{
     block::Block,
+    device_layout::DeviceLayout,
     io::{Read, Write},
-    layouts::Layout,
     name::Name,
     tree::TreeNode,
 };
@@ -25,10 +25,10 @@ mod block_cache;
 pub mod constants;
 mod controller;
 mod data_reader;
+mod device_layout;
 mod error;
 mod file;
 mod io;
-mod layouts;
 mod meta;
 mod name;
 mod node;
@@ -67,6 +67,11 @@ pub trait BlockDevice {
     fn write(&mut self, sector: Addr, buf: &[u8]) -> Result<(), Error>;
 }
 
-pub trait Addressable {
-    const LAYOUT: Layout;
+pub trait DeviceAddr {
+    const LAYOUT: DeviceLayout;
+
+    #[must_use]
+    fn addr(logical: Addr, offset: usize) -> Addr {
+        Self::LAYOUT.nth(logical) + offset as Addr
+    }
 }

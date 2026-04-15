@@ -1,5 +1,5 @@
 use crate::{
-    Addr, Addressable, Deserializable, Error, FixedLen, Layout, Name, Serializable,
+    Addr, Deserializable, DeviceAddr, DeviceLayout, Error, FixedLen, Name, Serializable,
     io::{Read, Write},
     tree::entry::{Entry, Kind},
 };
@@ -94,8 +94,8 @@ where
     None
 }
 
-impl Addressable for TreeNode {
-    const LAYOUT: Layout = Layout::TREE;
+impl DeviceAddr for TreeNode {
+    const LAYOUT: DeviceLayout = DeviceLayout::TREE;
 }
 
 impl FixedLen for TreeNode {

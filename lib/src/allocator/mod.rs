@@ -1,5 +1,6 @@
 use crate::{
-    Addr, Block, BlockDevice, Deserializable, Error, Serializable, layouts::Layout, node::Node,
+    Addr, Block, BlockDevice, Deserializable, Error, Serializable, device_layout::DeviceLayout,
+    node::Node,
 };
 pub use bitmap::Bitmap;
 
@@ -7,12 +8,12 @@ mod bitmap;
 
 #[derive(Debug)]
 pub struct Allocator {
-    layout: Layout,
+    layout: DeviceLayout,
     last_accessed: Addr,
 }
 
 impl Allocator {
-    pub const fn new(layout: Layout) -> Self {
+    pub const fn new(layout: DeviceLayout) -> Self {
         Self { layout, last_accessed: 0 }
     }
 
@@ -179,7 +180,7 @@ mod tests {
 
     use super::*;
 
-    const TEST_LAYOUT: Layout = Layout::new(0, 2);
+    const TEST_LAYOUT: DeviceLayout = DeviceLayout::new(0, 2);
 
     fn get_sut() -> (MemoryDevice, Allocator) {
         let device = MemoryDevice::fit(TEST_LAYOUT.sector_count());

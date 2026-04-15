@@ -1,7 +1,7 @@
 use crate::{
-    Addr, Addressable, Deserializable, Error, FixedLen, Name, Serializable,
+    Addr, Deserializable, DeviceAddr, Error, FixedLen, Name, Serializable,
+    device_layout::DeviceLayout,
     io::{Read, Write},
-    layouts::Layout,
 };
 
 #[derive(Eq, PartialEq, Debug, Clone)]
@@ -20,8 +20,8 @@ impl File {
     }
 }
 
-impl Addressable for File {
-    const LAYOUT: Layout = Layout::FILE;
+impl DeviceAddr for File {
+    const LAYOUT: DeviceLayout = DeviceLayout::FILE;
 }
 
 impl FixedLen for File {
@@ -59,6 +59,6 @@ mod tests {
         let _ = storage::store(&mut device, 123, &sut);
         let mut expected = Block::new();
         let _ = sut.serialize(&mut expected.writer());
-        device.assert_write(0, Layout::FILE.nth(123), &expected);
+        device.assert_write(0, DeviceLayout::FILE.nth(123), &expected);
     }
 }

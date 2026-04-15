@@ -6,13 +6,13 @@ const N_DATA: usize = Node::BLOCKS_PER_NODE * N_FILE;
 const N_FREE: usize = N_DATA / Bitmap::SLOTS;
 
 #[derive(Debug, Clone, Copy)]
-pub struct Layout {
+pub struct DeviceLayout {
     begin: Addr,
     end: Addr,
     blocks_per_entry: Addr,
 }
 
-impl Layout {
+impl DeviceLayout {
     pub const META: Self = Self::new(0, 1);
     pub const TREE_BITMAP: Self = next(Self::META, 1, 1);
     pub const DATA_BITMAP: Self = next(Self::TREE_BITMAP, N_FREE, 1);
@@ -69,29 +69,29 @@ impl Layout {
     }
 }
 
-const fn next(prev: Layout, capacity: usize, entry_size: usize) -> Layout {
-    Layout::new_with_size(prev.end, capacity as Addr, entry_size as Addr)
+const fn next(prev: DeviceLayout, capacity: usize, entry_size: usize) -> DeviceLayout {
+    DeviceLayout::new_with_size(prev.end, capacity as Addr, entry_size as Addr)
 }
 
 #[cfg(feature = "std")]
 pub fn print() {
     use std::println;
     println!("Disk layout:");
-    println!("  Meta: {:?} ({} bytes)", Layout::META, Layout::META.size_in_bytes());
+    println!("  Meta: {:?} ({} bytes)", DeviceLayout::META, DeviceLayout::META.size_in_bytes());
     println!(
         "  TreeBitmap: {:?} ({} bytes)",
-        Layout::TREE_BITMAP,
-        Layout::TREE_BITMAP.size_in_bytes()
+        DeviceLayout::TREE_BITMAP,
+        DeviceLayout::TREE_BITMAP.size_in_bytes()
     );
     println!(
         "  DataBitmap: {:?} ({} bytes)",
-        Layout::DATA_BITMAP,
-        Layout::DATA_BITMAP.size_in_bytes()
+        DeviceLayout::DATA_BITMAP,
+        DeviceLayout::DATA_BITMAP.size_in_bytes()
     );
-    println!("  Tree: {:?} ({} bytes)", Layout::TREE, Layout::TREE.size_in_bytes());
-    println!("  File: {:?} ({} bytes)", Layout::FILE, Layout::FILE.size_in_bytes());
-    println!("  Node: {:?} ({} bytes)", Layout::NODE, Layout::NODE.size_in_bytes());
-    println!("  Data: {:?} ({} bytes)", Layout::DATA, Layout::DATA.size_in_bytes());
+    println!("  Tree: {:?} ({} bytes)", DeviceLayout::TREE, DeviceLayout::TREE.size_in_bytes());
+    println!("  File: {:?} ({} bytes)", DeviceLayout::FILE, DeviceLayout::FILE.size_in_bytes());
+    println!("  Node: {:?} ({} bytes)", DeviceLayout::NODE, DeviceLayout::NODE.size_in_bytes());
+    println!("  Data: {:?} ({} bytes)", DeviceLayout::DATA, DeviceLayout::DATA.size_in_bytes());
     println!();
 }
 
@@ -100,23 +100,23 @@ mod tests {
 
     use super::*;
 
-    fn assert_continuous_layout_range(a: Layout, b: Layout) {
+    fn assert_continuous_layout_range(a: DeviceLayout, b: DeviceLayout) {
         assert!(a.end == b.begin, "range {a:?} does not end where {b:?} begins");
     }
 
     #[test]
     fn layout_ranges_are_continuous() {
-        assert_continuous_layout_range(Layout::META, Layout::TREE_BITMAP);
-        assert_continuous_layout_range(Layout::TREE_BITMAP, Layout::DATA_BITMAP);
-        assert_continuous_layout_range(Layout::DATA_BITMAP, Layout::TREE);
-        assert_continuous_layout_range(Layout::TREE, Layout::FILE);
-        assert_continuous_layout_range(Layout::FILE, Layout::NODE);
-        assert_continuous_layout_range(Layout::NODE, Layout::DATA);
+        assert_continuous_layout_range(DeviceLayout::META, DeviceLayout::TREE_BITMAP);
+        assert_continuous_layout_range(DeviceLayout::TREE_BITMAP, DeviceLayout::DATA_BITMAP);
+        assert_continuous_layout_range(DeviceLayout::DATA_BITMAP, DeviceLayout::TREE);
+        assert_continuous_layout_range(DeviceLayout::TREE, DeviceLayout::FILE);
+        assert_continuous_layout_range(DeviceLayout::FILE, DeviceLayout::NODE);
+        assert_continuous_layout_range(DeviceLayout::NODE, DeviceLayout::DATA);
     }
 
     #[test]
     fn new_with_size() {
-        let sut = Layout::new_with_size(2, 12, 4);
+        let sut = DeviceLayout::new_with_size(2, 12, 4);
         assert_eq!(sut.begin, 2);
         assert_eq!(sut.end, 50);
         assert_eq!(sut.sector_count(), 48);
@@ -125,7 +125,7 @@ mod tests {
 
     #[test]
     fn iter() {
-        let sut = Layout::new(5, 10);
+        let sut = DeviceLayout::new(5, 10);
         let mut iter = sut.iter();
         assert_eq!(Some((0, 5)), iter.next());
         assert_eq!(Some((1, 6)), iter.next());
@@ -135,7 +135,7 @@ mod tests {
 
     #[test]
     fn circular_iter() {
-        let sut = Layout::new(5, 10);
+        let sut = DeviceLayout::new(5, 10);
         let mut iter = sut.circular_iter(8);
         assert_eq!(Some((8, 13)), iter.next());
         assert_eq!(Some((9, 14)), iter.next());
@@ -145,7 +145,7 @@ mod tests {
 
     #[test]
     fn iter_sectors() {
-        let sut = Layout::new(5, 10);
+        let sut = DeviceLayout::new(5, 10);
         let iter = sut.iter_sectors();
         assert_eq!(5, iter.start);
         assert_eq!(15, iter.end);
@@ -153,22 +153,22 @@ mod tests {
 
     #[test]
     fn nth() {
-        let sut = Layout::new(0, 10);
+        let sut = DeviceLayout::new(0, 10);
         assert_eq!(sut.nth(5), 5);
     }
 
     #[test]
     #[should_panic(expected = "Address out of range")]
     fn nth_out_of_bounds() {
-        Layout::new(0, 10).nth(10);
+        DeviceLayout::new(0, 10).nth(10);
     }
 
     #[test]
     fn test_size_in_bytes() {
-        let sut = Layout::new(0, 10);
+        let sut = DeviceLayout::new(0, 10);
         assert_eq!(sut.size_in_bytes(), 10 * Block::LEN);
 
-        let sut = Layout::new_with_size(0, 10, 2);
+        let sut = DeviceLayout::new_with_size(0, 10, 2);
         assert_eq!(sut.size_in_bytes(), 10 * Block::LEN * 2);
     }
 
@@ -177,7 +177,7 @@ mod tests {
 
         #[test]
         fn nth() {
-            let sut = Layout::new_with_size(1, 10, 2);
+            let sut = DeviceLayout::new_with_size(1, 10, 2);
             assert_eq!(sut.nth(0), 1);
             assert_eq!(sut.nth(1), 3);
             assert_eq!(sut.nth(2), 5);
@@ -186,7 +186,7 @@ mod tests {
 
         #[test]
         fn iter() {
-            let sut = Layout::new_with_size(1, 13, 4);
+            let sut = DeviceLayout::new_with_size(1, 13, 4);
             let mut iter = sut.iter();
             assert_eq!(Some((0, 1)), iter.next());
             assert_eq!(Some((1, 5)), iter.next());
@@ -196,7 +196,7 @@ mod tests {
 
         #[test]
         fn circular_iter() {
-            let sut = Layout::new_with_size(1, 13, 4);
+            let sut = DeviceLayout::new_with_size(1, 13, 4);
             let mut iter = sut.circular_iter(2);
             assert_eq!(Some((2, 9)), iter.next());
             assert_eq!(Some((3, 13)), iter.next());

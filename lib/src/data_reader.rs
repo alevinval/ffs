@@ -1,6 +1,6 @@
 use crate::{
-    BlockDevice, Error, block::Block, block_cache::BlockCache, io::Writer, layouts::Layout,
-    node::Node,
+    BlockDevice, Error, block::Block, block_cache::BlockCache, device_layout::DeviceLayout,
+    io::Writer, node::Node,
 };
 
 pub struct DataReader<'dev, D>
@@ -38,7 +38,7 @@ where
         for (i, data_addr) in
             self.node.data_addrs().iter().take(self.node.blocks_needed()).enumerate()
         {
-            let sector = Layout::DATA.nth(*data_addr);
+            let sector = DeviceLayout::DATA.nth(*data_addr);
             self.device.read(sector, &mut block)?;
             if i == blocks_needed - 1 {
                 let remaining_bytes = self.node.file_len() as usize % Block::LEN;

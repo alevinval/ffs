@@ -171,12 +171,13 @@ where
 mod tests {
     use std::println;
 
-    use crate::{FixedLen, layouts::Layout, testutils::MemoryDevice, tree::printer};
+    use crate::{FixedLen, device_layout::DeviceLayout, testutils::MemoryDevice, tree::printer};
 
     use super::*;
 
-    const TREE_BITMAP: Layout = Layout::new(0, 1);
-    const TREE_LAYOUT: Layout = Layout::new_with_size(0, 10, TreeNode::BLOCKS_LEN as u32);
+    const TREE_BITMAP: DeviceLayout = DeviceLayout::new(0, 1);
+    const TREE_LAYOUT: DeviceLayout =
+        DeviceLayout::new_with_size(0, 10, TreeNode::BLOCKS_LEN as u32);
 
     pub(super) fn setup_tree() -> (MemoryDevice, Allocator) {
         let mut device =

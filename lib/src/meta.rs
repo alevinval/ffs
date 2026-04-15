@@ -1,7 +1,7 @@
 use crate::{
-    Addr, Addressable, Block, Deserializable, Error, FixedLen, Serializable,
+    Addr, Block, Deserializable, DeviceAddr, Error, FixedLen, Serializable,
+    device_layout::DeviceLayout,
     io::{Read, Write},
-    layouts::Layout,
 };
 
 #[derive(PartialEq, Eq, Debug)]
@@ -27,20 +27,20 @@ impl Meta {
 
     pub const fn new() -> Self {
         Self {
-            tree_bitmap: Layout::TREE_BITMAP.begin(),
-            tree_sector: Layout::TREE.begin(),
-            file_sector: Layout::FILE.begin(),
-            node_sector: Layout::NODE.begin(),
-            data_bitmap: Layout::DATA_BITMAP.begin(),
-            data_sector: Layout::DATA.begin(),
+            tree_bitmap: DeviceLayout::TREE_BITMAP.begin(),
+            tree_sector: DeviceLayout::TREE.begin(),
+            file_sector: DeviceLayout::FILE.begin(),
+            node_sector: DeviceLayout::NODE.begin(),
+            data_bitmap: DeviceLayout::DATA_BITMAP.begin(),
+            data_sector: DeviceLayout::DATA.begin(),
             block_size: Block::LEN as u16,
             signature: Self::SIGNATURE,
         }
     }
 }
 
-impl Addressable for Meta {
-    const LAYOUT: Layout = Layout::META;
+impl DeviceAddr for Meta {
+    const LAYOUT: DeviceLayout = DeviceLayout::META;
 }
 
 impl FixedLen for Meta {
