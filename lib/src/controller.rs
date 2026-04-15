@@ -3,7 +3,7 @@ use core::fmt;
 use crate::{
     BlockDevice, Error,
     allocator::{Allocator, DataAllocator},
-    cache::BlockCache,
+    block_cache::BlockCache,
     data_reader::DataReader,
     file::File,
     layouts::Layout,

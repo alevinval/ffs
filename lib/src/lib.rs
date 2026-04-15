@@ -21,7 +21,7 @@ use crate::{
 
 mod allocator;
 mod block;
-mod cache;
+mod block_cache;
 pub mod constants;
 mod controller;
 mod data_reader;
@@ -36,7 +36,8 @@ mod paths;
 mod storage;
 mod tree;
 
-pub type Addr = u32; // Logical address type for sectors/blocks. Change here to update everywhere.
+// Logical address type for sectors/blocks. Change here to update everywhere.
+pub type Addr = u32;
 
 /// Trait for types that have a constant length when serialized/deserialized.
 pub trait FixedLen {

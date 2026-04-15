@@ -1,5 +1,6 @@
 use crate::{
-    BlockDevice, Error, block::Block, cache::BlockCache, io::Writer, layouts::Layout, node::Node,
+    BlockDevice, Error, block::Block, block_cache::BlockCache, io::Writer, layouts::Layout,
+    node::Node,
 };
 
 pub struct DataReader<'dev, D>
