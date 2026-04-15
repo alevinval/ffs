@@ -7,7 +7,7 @@ const N_FREE: usize = N_DATA / Bitmap::SLOTS;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Layout {
-    pub(crate) begin: Addr,
+    begin: Addr,
     end: Addr,
     blocks_per_entry: Addr,
 }
@@ -23,6 +23,10 @@ impl Layout {
 
     pub const fn new(begin: Addr, capacity: Addr) -> Self {
         Self::new_with_size(begin, capacity, 1)
+    }
+
+    pub const fn begin(self) -> Addr {
+        self.begin
     }
 
     pub const fn new_with_size(begin: Addr, capacity: Addr, blocks_per_entry: Addr) -> Self {

@@ -27,12 +27,12 @@ impl Meta {
 
     pub const fn new() -> Self {
         Self {
-            tree_bitmap: Layout::TREE_BITMAP.begin,
-            tree_sector: Layout::TREE.begin,
-            file_sector: Layout::FILE.begin,
-            node_sector: Layout::NODE.begin,
-            data_bitmap: Layout::DATA_BITMAP.begin,
-            data_sector: Layout::DATA.begin,
+            tree_bitmap: Layout::TREE_BITMAP.begin(),
+            tree_sector: Layout::TREE.begin(),
+            file_sector: Layout::FILE.begin(),
+            node_sector: Layout::NODE.begin(),
+            data_bitmap: Layout::DATA_BITMAP.begin(),
+            data_sector: Layout::DATA.begin(),
             block_size: Block::LEN as u16,
             signature: Self::SIGNATURE,
         }
