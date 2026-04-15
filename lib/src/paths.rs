@@ -1,13 +1,13 @@
-use crate::{Error, Name};
+use crate::{Error, constants};
 
 pub const SEPARATOR: char = '/';
 
 pub fn validate(path: &str) -> Result<(), Error> {
     let first_component = first_component(path);
-    if first_component == path && path.len() < Name::LEN {
+    if first_component == path && path.len() < constants::NAME_LEN {
         return Ok(());
     }
-    if first_component.len() >= Name::LEN {
+    if first_component.len() >= constants::NAME_LEN {
         return Err(Error::NameTooLong);
     }
     validate(tail(path))
@@ -41,13 +41,13 @@ mod tests {
 
     #[test]
     fn test_validate() {
-        let mut input = "a".repeat(Name::LEN - 1);
+        let mut input = "a".repeat(constants::NAME_LEN - 1);
         assert!(validate(&input).is_ok());
 
         input += "/a/b/c/d/";
         assert!(validate(&input).is_ok());
 
-        input += "a".repeat(Name::LEN).as_str();
+        input += "a".repeat(constants::NAME_LEN).as_str();
         assert_eq!(Error::NameTooLong, validate(&input).unwrap_err());
     }
 

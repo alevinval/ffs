@@ -4,6 +4,7 @@ use crate::{
     BlockDevice, Error,
     allocator::{Allocator, DataAllocator},
     block_cache::BlockCache,
+    constants,
     data_reader::DataReader,
     device_layout::DeviceLayout,
     file::File,
@@ -55,7 +56,7 @@ where
         paths::validate(file_path)?;
 
         let file_size = data.len();
-        if file_size > Node::MAX_FILE_SIZE {
+        if file_size > constants::MAX_FILE_SIZE {
             return Err(Error::FileTooLarge);
         }
 

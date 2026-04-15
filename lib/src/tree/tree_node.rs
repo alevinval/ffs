@@ -1,5 +1,5 @@
 use crate::{
-    Addr, Deserializable, DeviceAddr, DeviceLayout, Error, FixedLen, Name, Serializable,
+    Addr, Deserializable, DeviceAddr, DeviceLayout, Error, FixedLen, Name, Serializable, constants,
     io::{Read, Write},
     tree::entry::{Entry, Kind},
 };
@@ -16,7 +16,7 @@ impl Default for TreeNode {
 }
 
 impl TreeNode {
-    pub const LEN: usize = 30;
+    pub const LEN: usize = constants::TREE_NODE_ENTRY_LEN;
 
     #[must_use]
     pub const fn new() -> Self {

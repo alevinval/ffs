@@ -1,8 +1,8 @@
-use crate::{Addr, FixedLen, allocator::Bitmap, block::Block, node::Node, tree::TreeNode};
+use crate::{Addr, FixedLen, allocator::Bitmap, block::Block, constants, tree::TreeNode};
 
 const N_TREE: usize = 100;
 const N_FILE: usize = N_TREE * TreeNode::LEN;
-const N_DATA: usize = Node::BLOCKS_PER_NODE * N_FILE;
+const N_DATA: usize = constants::NODE_DATA_BLOCKS_LEN * N_FILE;
 const N_FREE: usize = N_DATA / Bitmap::SLOTS;
 
 #[derive(Debug, Clone, Copy)]

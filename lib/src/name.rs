@@ -6,7 +6,7 @@
 //! maximum length constraint.
 
 use crate::{
-    Deserializable, Error, FixedLen, Serializable,
+    Deserializable, Error, FixedLen, Serializable, constants,
     io::{Read, Write},
     paths,
 };
@@ -18,8 +18,7 @@ pub struct Name {
 }
 
 impl Name {
-    /// Maximum length of a file name in bytes.
-    pub const LEN: usize = 45;
+    const LEN: usize = constants::NAME_LEN;
 
     #[must_use]
     pub const fn empty() -> Self {

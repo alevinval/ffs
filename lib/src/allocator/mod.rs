@@ -1,6 +1,6 @@
 use crate::{
-    Addr, Block, BlockDevice, Deserializable, Error, Serializable, device_layout::DeviceLayout,
-    node::Node,
+    Addr, Block, BlockDevice, Deserializable, Error, Serializable, constants,
+    device_layout::DeviceLayout, node::Node,
 };
 pub use bitmap::Bitmap;
 
@@ -143,7 +143,7 @@ impl DataAllocator for Allocator {
         device: &mut D,
         file_size: usize,
     ) -> Result<Node, Error> {
-        let mut block_addrs = [0; Node::BLOCKS_PER_NODE];
+        let mut block_addrs = [0; constants::NODE_DATA_BLOCKS_LEN];
         self.allocate_n(device, &mut block_addrs, file_size.div_ceil(Block::LEN))?;
         Ok(Node::new(file_size as u16, block_addrs))
     }
