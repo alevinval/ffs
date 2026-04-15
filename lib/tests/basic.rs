@@ -1,4 +1,4 @@
-use ffs_lib::{BlockDevice, Constants, Controller, Error, testutils::MemoryDevice};
+use ffs_lib::{BlockDevice, Controller, Error, constants, testutils::MemoryDevice};
 
 const FILE_PATH: &str = "/some/path/some-file-name";
 const DATA_FIXTURE: &[u8] = b"some data for file";
@@ -79,11 +79,11 @@ fn create_max_files() {
         let mut subdir = 0;
 
         for i in 0..=n_files {
-            let full_dir = i % Constants::DIR_NODE_ENTRIES == 0;
+            let full_dir = i % constants::DIR_NODE_ENTRIES == 0;
 
             if full_dir && i > 0 {
                 subdir += 1;
-                if subdir == Constants::DIR_NODE_ENTRIES {
+                if subdir == constants::DIR_NODE_ENTRIES {
                     subdir = 0;
                     dir += 1;
                 }

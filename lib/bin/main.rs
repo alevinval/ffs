@@ -90,7 +90,7 @@ Ligula congue sollicitudin erat viverra ac tincidunt nam. Euismod quam justo lec
 
     println!("> Reading file contents");
     let mut fd = ctrl.open(fname).expect("failed to open file");
-    let mut buf = [0u8; ffs_lib::Constants::MAX_FILE_SIZE];
+    let mut buf = [0u8; ffs_lib::constants::MAX_FILE_SIZE];
     fd.readall(&mut buf).expect("failed to read file");
     println!("> Read {} bytes from {fname}", fd.file_len());
     println!("> Contents:\n\n{}\n", str::from_utf8(&buf[..fd.file_len() as usize]).unwrap());

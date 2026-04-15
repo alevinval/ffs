@@ -16,13 +16,13 @@ use crate::{
     io::{Read, Write},
     layouts::Layout,
     name::Name,
-    node::Node,
     tree::TreeNode,
 };
 
 mod allocator;
 mod block;
 mod cache;
+pub mod constants;
 mod controller;
 mod data_reader;
 mod error;
@@ -68,12 +68,4 @@ pub trait BlockDevice {
 
 pub trait Addressable {
     const LAYOUT: Layout;
-}
-
-pub struct Constants {}
-
-impl Constants {
-    pub const MAX_FILE_SIZE: usize = Node::MAX_FILE_SIZE;
-    pub const FILENAME_LEN: usize = Name::LEN;
-    pub const DIR_NODE_ENTRIES: usize = TreeNode::LEN;
 }
