@@ -5,9 +5,9 @@ use crate::{
     allocator::{Allocator, DataAllocator},
     block_cache::BlockCache,
     constants,
-    data_reader::DataReader,
     device_layout::DeviceLayout,
     file::File,
+    file_handle::FileHandle,
     meta::Meta,
     node::Node,
     paths, storage,
@@ -15,10 +15,7 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub struct Controller<D>
-where
-    D: BlockDevice,
-{
+pub struct Controller<D> {
     device: BlockCache<D>,
     data_allocator: Allocator,
     tree_allocator: Allocator,
@@ -30,10 +27,10 @@ where
 {
     pub fn mount(mut device: D) -> Result<Self, Error> {
         let meta: Meta = storage::load(&mut device, 0)?;
+        let device = BlockCache::mount(device);
         if meta != Meta::new() {
             return Err(Error::UnsupportedDevice);
         }
-        let device = BlockCache::mount(device);
         let data_allocator = Allocator::new(DeviceLayout::DATA_BITMAP);
         let tree_allocator = Allocator::new(DeviceLayout::TREE_BITMAP);
         Ok(Self { device, data_allocator, tree_allocator })
@@ -84,12 +81,12 @@ where
         Ok(())
     }
 
-    pub fn open(&mut self, file_path: &str) -> Result<DataReader<'_, D>, Error> {
+    pub fn open(&mut self, file_path: &str) -> Result<FileHandle<'_>, Error> {
         paths::validate(file_path)?;
 
         let entry = Tree::get_file(&mut self.device, file_path)?;
         let node: Node = storage::load(&mut self.device, entry.addr())?;
-        Ok(DataReader::new(&mut self.device, node))
+        Ok(FileHandle::new(&mut self.device, node))
     }
 
     pub fn count_files(&mut self) -> Result<usize, Error> {

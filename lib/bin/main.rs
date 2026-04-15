@@ -1,4 +1,4 @@
-use ffs_lib::{BlockDevice, Controller, testutils::FileDevice};
+use ffs_lib::{BlockDevice, Controller, testutils::MemoryDevice};
 
 fn ls_tree<D>(ctrl: &mut Controller<D>, base_path: &str, depth: usize)
 where
@@ -52,20 +52,20 @@ Montes nascetur ridiculus mus donec rhoncus eros lobortis. Maximus eget fermentu
 Vestibulum fusce dictum risus blandit quis suspendisse aliquet. Ante condimentum neque at luctus nibh finibus facilisis.
 Ligula congue sollicitudin erat viverra ac tincidunt nam. Euismod quam justo lectus commodo augue arcu dignissim.";
 
-    // let sdcard = MemoryDisk::load_from_file(512, "sdcard.img").map_or_else(
-    //     |_| {
-    //         println!("Formatting sdcard...");
-    //         let mut disk = MemoryDisk::new(512, 8 * 1024 * 1024);
-    //         Controller::format(&mut disk).expect("failed to format SD card");
-    //         disk
-    //     },
-    //     |disk| {
-    //         println!("Loaded sdcard.img");
-    //         disk
-    //     },
-    // );
+    let sdcard = MemoryDevice::load_from_file(512, "sdcard.img").map_or_else(
+        |_| {
+            println!("Formatting sdcard...");
+            let mut disk = MemoryDevice::new(512, 8 * 1024 * 1024);
+            Controller::format(&mut disk).expect("failed to format SD card");
+            disk
+        },
+        |disk| {
+            println!("Loaded sdcard.img");
+            disk
+        },
+    );
 
-    let sdcard = FileDevice::new("/dev/sdb").expect("cannot open device");
+    // let sdcard = FileDevice::new("/dev/sdb").expect("cannot open device");
 
     // Controller::format(&mut sdcard).expect("failed to format SD card");
     // println!("partitioned!");

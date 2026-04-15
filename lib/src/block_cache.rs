@@ -7,7 +7,7 @@ struct CacheEntry {
 }
 
 #[derive(Debug)]
-pub struct BlockCache<D: BlockDevice, const SIZE: usize = 8> {
+pub struct BlockCache<D, const SIZE: usize = 8> {
     delegate: D,
     entries: [Option<CacheEntry>; SIZE],
 }
@@ -15,7 +15,10 @@ pub struct BlockCache<D: BlockDevice, const SIZE: usize = 8> {
 /// Implements an LRU cache for a [`BlockDevice`] to minimize the number of
 /// read and write operations to the underlying device. It can be used as a
 /// drop-in replacement for any [`BlockDevice`].
-impl<D: BlockDevice, const SIZE: usize> BlockCache<D, SIZE> {
+impl<D, const SIZE: usize> BlockCache<D, SIZE>
+where
+    D: BlockDevice,
+{
     /// Takes ownership of a [`BlockDevice`], and returns a new [`BlockCache`].
     pub const fn mount(device: D) -> Self {
         Self { delegate: device, entries: [const { None }; SIZE] }
@@ -46,7 +49,10 @@ impl<D: BlockDevice, const SIZE: usize> BlockCache<D, SIZE> {
 
 /// Implements the [`BlockDevice`] trait for the [`BlockCache`]. Intercepting
 /// read and write operations to read and populate the cache.
-impl<D: BlockDevice> BlockDevice for BlockCache<D> {
+impl<D> BlockDevice for BlockCache<D>
+where
+    D: BlockDevice,
+{
     fn read(&mut self, sector: Addr, buf: &mut [u8]) -> Result<(), Error> {
         if let Some(block) = self.get(sector) {
             buf.copy_from_slice(block);

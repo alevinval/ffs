@@ -1,21 +1,14 @@
 use crate::{
-    BlockDevice, Error, block::Block, block_cache::BlockCache, device_layout::DeviceLayout,
-    io::Writer, node::Node,
+    BlockDevice, Error, block::Block, device_layout::DeviceLayout, io::Writer, node::Node,
 };
 
-pub struct DataReader<'dev, D>
-where
-    D: BlockDevice,
-{
-    device: &'dev mut BlockCache<D>,
+pub struct FileHandle<'dev> {
+    device: &'dev mut dyn BlockDevice,
     node: Node,
 }
 
-impl<'dev, D> DataReader<'dev, D>
-where
-    D: BlockDevice,
-{
-    pub const fn new(device: &'dev mut BlockCache<D>, node: Node) -> Self {
+impl<'dev> FileHandle<'dev> {
+    pub const fn new(device: &'dev mut dyn BlockDevice, node: Node) -> Self {
         Self { device, node }
     }
 
