@@ -8,7 +8,7 @@ pub fn validate(path: &str) -> Result<(), Error> {
         return Ok(());
     }
     if first_component.len() >= Name::LEN {
-        return Err(Error::FileNameTooLong);
+        return Err(Error::NameTooLong);
     }
     validate(tail(path))
 }
@@ -48,7 +48,7 @@ mod tests {
         assert!(validate(&input).is_ok());
 
         input += "a".repeat(Name::LEN).as_str();
-        assert_eq!(Error::FileNameTooLong, validate(&input).unwrap_err());
+        assert_eq!(Error::NameTooLong, validate(&input).unwrap_err());
     }
 
     #[test]

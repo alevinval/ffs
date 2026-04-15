@@ -1,7 +1,7 @@
 //! Filesystem represents file names as byte arrays with fixed capacity of
-//! [`Name::MAX_LEN`], ensuring a fixed-size format when stored on disk.
+//! [`Name::LEN`], ensuring a fixed-size format when stored on disk.
 //!
-//! To facilitate type safety, incoming `&str` file naames are converted to
+//! To facilitate type safety, incoming `&str` file names are converted to
 //! [`Name`] to ensure that file names are always valid and conform to the
 //! maximum length constraint.
 
@@ -32,19 +32,18 @@ impl Name {
     /// Returns an error if the provided name exceeds the maximum length of
     /// [`Self::MAX_LEN`].
     pub fn new(name: &str) -> Result<Self, Error> {
-        assert!(
+        debug_assert!(
             !name.contains(paths::SEPARATOR),
             "File names should never contain a separator character"
         );
 
         if name.len() > Self::LEN {
-            return Err(Error::FileNameTooLong);
+            return Err(Error::NameTooLong);
         }
 
         let mut buf = [0u8; Self::LEN];
-        let len = name.len();
-        buf[..len].copy_from_slice(&name.as_bytes()[..len]);
-        Ok(Self { buf, len })
+        buf[..name.len()].copy_from_slice(name.as_bytes());
+        Ok(Self { buf, len: name.len() })
     }
 
     /// Returns the file name as a string slice.
@@ -70,12 +69,12 @@ impl Deserializable<Self> for Name {
     fn deserialize<R: Read>(reader: &mut R) -> Result<Self, Error> {
         let len = reader.read_u8()? as usize;
         if len > Self::LEN {
-            return Err(Error::FileNameTooLong);
+            return Err(Error::NameTooLong);
         }
 
-        let mut buffer = [0u8; Self::LEN];
-        reader.read(&mut buffer)?;
-        Ok(Self { buf: buffer, len })
+        let mut buf = [0u8; Self::LEN];
+        reader.read(&mut buf)?;
+        Ok(Self { buf, len })
     }
 }
 
@@ -106,14 +105,14 @@ impl PartialEq<Name> for &str {
 #[cfg(test)]
 impl From<&str> for Name {
     fn from(name: &str) -> Self {
-        Self::new(name).expect("FileName::from should not fail with valid input")
+        Self::new(name).expect("invalid name input")
     }
 }
 
 #[cfg(test)]
 impl From<std::string::String> for Name {
     fn from(name: std::string::String) -> Self {
-        Self::new(&name).expect("FileName::from should not fail with valid input")
+        Self::new(&name).expect("invalid name input")
     }
 }
 
@@ -131,6 +130,7 @@ mod tests {
         let sut = Name::empty();
         assert_eq!(sut.len, 0);
         assert_eq!(sut.buf, [0u8; Name::LEN]);
+        assert_eq!(Name::empty(), Name::empty());
     }
 
     #[test]
@@ -138,12 +138,13 @@ mod tests {
         let name = "valid_name";
         let sut = Name::new(name).unwrap();
         assert_eq!(name, sut.as_str());
+        assert_eq!(Name::new(name), Name::new(name));
     }
 
     #[test]
     fn test_name_exceeds_max_len() {
         let name = "b".repeat(Name::LEN + 1);
         let result = Name::new(&name);
-        assert_eq!(Error::FileNameTooLong, result.unwrap_err());
+        assert_eq!(Error::NameTooLong, result.unwrap_err());
     }
 }

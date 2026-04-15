@@ -52,7 +52,7 @@ fn create_then_delete_file() {
 fn create_file_with_long_name_fails() {
     let long_name = str::from_utf8(&[27u8; 129]).unwrap();
     let device = mounting(device(), |ctrl| {
-        assert_eq!(Error::FileNameTooLong, ctrl.create(long_name, DATA_FIXTURE).unwrap_err());
+        assert_eq!(Error::NameTooLong, ctrl.create(long_name, DATA_FIXTURE).unwrap_err());
     });
 
     assert_eq!(2, device.reads_count);

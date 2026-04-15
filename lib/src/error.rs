@@ -9,7 +9,7 @@ pub enum Error {
     /// The file already exists.
     FileAlreadyExists,
     /// The name exceeds the maximum allowed length.
-    FileNameTooLong,
+    NameTooLong,
     /// The file does not exist.
     FileNotFound,
     /// The file is too large to be stored.
