@@ -14,9 +14,9 @@ pub use error::Error;
 use crate::{
     block::Block,
     device_layout::DeviceLayout,
+    directory::TreeNode,
     io::{Read, Write},
     name::Name,
-    tree::TreeNode,
 };
 
 mod allocator;
@@ -25,6 +25,7 @@ mod block_cache;
 pub mod constants;
 mod controller;
 mod device_layout;
+mod directory;
 mod error;
 mod file;
 mod file_handle;
@@ -34,7 +35,6 @@ mod name;
 mod node;
 mod paths;
 mod storage;
-mod tree;
 
 // Logical address type for sectors/blocks. Change here to update everywhere.
 pub type Addr = u32;

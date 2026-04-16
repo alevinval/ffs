@@ -6,12 +6,12 @@ use crate::{
     block_cache::BlockCache,
     constants,
     device_layout::DeviceLayout,
+    directory::{self, printer},
     file::File,
     file_handle::FileHandle,
     meta::Meta,
     node::Node,
     paths, storage,
-    tree::{Tree, printer},
 };
 
 #[derive(Debug)]
@@ -42,7 +42,7 @@ where
 
     pub fn format(device: &mut D) -> Result<(), Error> {
         storage::store(device, 0, &Meta::new())?;
-        Tree::format(device, &mut Allocator::new(DeviceLayout::TREE_BITMAP))?;
+        directory::format(device, &mut Allocator::new(DeviceLayout::TREE_BITMAP))?;
         Ok(())
     }
 
@@ -57,7 +57,7 @@ where
             return Err(Error::FileTooLarge);
         }
 
-        let entry = Tree::insert_file(&mut self.device, &mut self.tree_allocator, file_path)?;
+        let entry = directory::insert_file(&mut self.device, &mut self.tree_allocator, file_path)?;
         let file = File::new(*entry.name(), entry.addr());
         let node = self.data_allocator.allocate_node_data(&mut self.device, file_size)?;
         storage::store_data(&mut self.device, node.data_addrs(), data)?;
@@ -69,12 +69,12 @@ where
     pub fn delete(&mut self, file_path: &str) -> Result<(), Error> {
         paths::validate(file_path)?;
 
-        let entry = Tree::get_file(&mut self.device, file_path)?;
+        let entry = directory::get_file(&mut self.device, file_path)?;
         let node: Node = storage::load(&mut self.device, entry.addr())?;
         storage::erase::<_, Node>(&mut self.device, entry.addr())?;
         storage::erase::<_, File>(&mut self.device, entry.addr())?;
-        Tree::remove_file(&mut self.device, file_path)?;
-        Tree::prune(&mut self.device, &mut self.tree_allocator, 0)?;
+        directory::remove_file(&mut self.device, file_path)?;
+        directory::prune(&mut self.device, &mut self.tree_allocator, 0)?;
 
         // Release data blocks only after metadata is fully erased.
         self.data_allocator.release_node_data(&mut self.device, &node)?;
@@ -84,17 +84,17 @@ where
     pub fn open(&mut self, file_path: &str) -> Result<FileHandle<'_>, Error> {
         paths::validate(file_path)?;
 
-        let entry = Tree::get_file(&mut self.device, file_path)?;
+        let entry = directory::get_file(&mut self.device, file_path)?;
         let node: Node = storage::load(&mut self.device, entry.addr())?;
         Ok(FileHandle::new(&mut self.device, node))
     }
 
     pub fn count_files(&mut self) -> Result<usize, Error> {
-        Tree::count_files(&mut self.device)
+        directory::count_files(&mut self.device)
     }
 
     pub fn count_dirs(&mut self) -> Result<usize, Error> {
-        Tree::count_dirs(&mut self.device)
+        directory::count_dirs(&mut self.device)
     }
 
     pub fn count_free_data_blocks(&mut self) -> Result<usize, Error> {

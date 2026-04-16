@@ -1,12 +1,12 @@
 use crate::io::{Error, Read};
 
-pub struct Reader<'a> {
-    buf: &'a [u8],
+pub struct Reader<'src> {
+    buf: &'src [u8],
     pos: usize,
 }
 
-impl<'a> Reader<'a> {
-    pub const fn new(buf: &'a [u8]) -> Self {
+impl<'src> Reader<'src> {
+    pub const fn new(buf: &'src [u8]) -> Self {
         Self { buf, pos: 0 }
     }
 

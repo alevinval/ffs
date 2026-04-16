@@ -4,26 +4,26 @@ use crate::{
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Entry {
+pub struct DirEntry {
     name: Name,
     addr: Addr,
-    kind: Kind,
+    kind: DirEntryKind,
 }
 
-impl Entry {
+impl DirEntry {
     pub const fn empty() -> Self {
-        Self { name: Name::empty(), addr: 0, kind: Kind::Dir }
+        Self { name: Name::empty(), addr: 0, kind: DirEntryKind::Dir }
     }
 
-    pub const fn new(name: Name, addr: Addr, kind: Kind) -> Self {
+    pub const fn new(name: Name, addr: Addr, kind: DirEntryKind) -> Self {
         Self { name, addr, kind }
     }
 
     pub const fn is_dir(&self) -> bool {
-        matches!(self.kind, Kind::Dir)
+        matches!(self.kind, DirEntryKind::Dir)
     }
 
-    pub const fn kind(&self) -> Kind {
+    pub const fn kind(&self) -> DirEntryKind {
         self.kind
     }
 
@@ -40,11 +40,11 @@ impl Entry {
     }
 }
 
-impl FixedLen for Entry {
-    const BYTES_LEN: usize = Name::BYTES_LEN + size_of::<Addr>() + Kind::BYTES_LEN;
+impl FixedLen for DirEntry {
+    const BYTES_LEN: usize = Name::BYTES_LEN + size_of::<Addr>() + DirEntryKind::BYTES_LEN;
 }
 
-impl Serializable for Entry {
+impl Serializable for DirEntry {
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<usize, Error> {
         let mut n = self.name.serialize(writer)?;
         n += writer.write_addr(self.addr)?;
@@ -53,26 +53,26 @@ impl Serializable for Entry {
     }
 }
 
-impl Deserializable<Self> for Entry {
+impl Deserializable<Self> for DirEntry {
     fn deserialize<R: Read>(reader: &mut R) -> Result<Self, Error> {
         let name = Name::deserialize(reader)?;
         let addr = reader.read_addr()?;
-        let kind = Kind::deserialize(reader)?;
+        let kind = DirEntryKind::deserialize(reader)?;
         Ok(Self { name, addr, kind })
     }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum Kind {
+pub enum DirEntryKind {
     File,
     Dir,
 }
 
-impl FixedLen for Kind {
+impl FixedLen for DirEntryKind {
     const BYTES_LEN: usize = 1;
 }
 
-impl Serializable for Kind {
+impl Serializable for DirEntryKind {
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<usize, Error> {
         let kind_byte = match self {
             Self::File => 0,
@@ -83,7 +83,7 @@ impl Serializable for Kind {
     }
 }
 
-impl Deserializable<Self> for Kind {
+impl Deserializable<Self> for DirEntryKind {
     fn deserialize<R: Read>(reader: &mut R) -> Result<Self, Error> {
         let byte = reader.read_u8()?;
         match byte {
@@ -101,5 +101,5 @@ mod tests {
 
     use super::*;
 
-    test_serde_symmetry!(Entry, Entry::new("test_file".into(), 1, Kind::File));
+    test_serde_symmetry!(DirEntry, DirEntry::new("test_file".into(), 1, DirEntryKind::File));
 }

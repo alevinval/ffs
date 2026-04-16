@@ -1,6 +1,6 @@
 use core::fmt;
 
-use crate::{Addr, BlockDevice, Error, TreeNode, storage, tree};
+use crate::{Addr, BlockDevice, Error, TreeNode, directory::find_and_then, storage};
 
 pub fn print_to<D, W>(
     device: &mut D,
@@ -12,7 +12,7 @@ where
     D: BlockDevice,
     W: fmt::Write,
 {
-    tree::find_and_then(device, base_path, 0, |device, _addr, node, pos| {
+    find_and_then(device, base_path, 0, |device, _addr, node, pos| {
         let entry = node.get(pos);
         if !entry.is_dir() {
             return Err(Error::DirectoryNotFound);
@@ -35,13 +35,17 @@ where
     Ok(())
 }
 
-fn print_in_order<D: BlockDevice, W: fmt::Write>(
+fn print_in_order<D, W>(
     device: &mut D,
     addr: Addr,
     max_depth: usize,
     depth: usize,
     out: &mut W,
-) -> Result<(), Error> {
+) -> Result<(), Error>
+where
+    D: BlockDevice,
+    W: fmt::Write,
+{
     if max_depth > 0 && depth >= max_depth {
         return Ok(());
     } else if depth == 0 {
@@ -66,7 +70,7 @@ fn print_in_order<D: BlockDevice, W: fmt::Write>(
 mod tests {
     use std::string::String;
 
-    use crate::tree::{Tree, tests::setup_tree};
+    use crate::directory::{self, tests::setup_tree};
 
     use super::*;
 
@@ -81,9 +85,9 @@ mod tests {
         let (mut device, mut allocator) = setup_tree();
         assert_empty_print(&mut device);
 
-        Tree::insert_file(&mut device, &mut allocator, "dir1/dir2/old.txt")
+        directory::insert_file(&mut device, &mut allocator, "dir1/dir2/old.txt")
             .expect("should insert file");
-        Tree::insert_file(&mut device, &mut allocator, "dir1/dir2/dir3/file.txt")
+        directory::insert_file(&mut device, &mut allocator, "dir1/dir2/dir3/file.txt")
             .expect("shoud insert file");
         let mut actual = String::new();
         assert_eq!(Ok(()), print_to(&mut device, "", 0, &mut actual));
@@ -102,7 +106,7 @@ mod tests {
         let (mut device, mut allocator) = setup_tree();
         assert_empty_print(&mut device);
 
-        let _ = Tree::insert_file(&mut device, &mut allocator, "dir1/dir2/dir3/file.txt");
+        let _ = directory::insert_file(&mut device, &mut allocator, "dir1/dir2/dir3/file.txt");
         let mut actual = String::new();
         assert_eq!(Ok(()), print_to(&mut device, "dir1/dir2", 0, &mut actual));
         let expected = "../
@@ -117,10 +121,10 @@ mod tests {
         let (mut device, mut allocator) = setup_tree();
         assert_empty_print(&mut device);
 
-        let _ = Tree::insert_file(&mut device, &mut allocator, "dir1/dir2/dir3/file.txt");
-        let _ = Tree::insert_file(&mut device, &mut allocator, "dir1/dir3/file.txt");
-        let _ = Tree::insert_file(&mut device, &mut allocator, "dir1/dir3/dir4/dir5/file.txt");
-        let _ = Tree::insert_file(&mut device, &mut allocator, "dir1/file.txt");
+        let _ = directory::insert_file(&mut device, &mut allocator, "dir1/dir2/dir3/file.txt");
+        let _ = directory::insert_file(&mut device, &mut allocator, "dir1/dir3/file.txt");
+        let _ = directory::insert_file(&mut device, &mut allocator, "dir1/dir3/dir4/dir5/file.txt");
+        let _ = directory::insert_file(&mut device, &mut allocator, "dir1/file.txt");
         let mut actual = String::new();
         assert_eq!(Ok(()), print_to(&mut device, "dir1", 2, &mut actual));
         let expected = "../
@@ -139,10 +143,10 @@ mod tests {
         let (mut device, mut allocator) = setup_tree();
         assert_empty_print(&mut device);
 
-        let _ = Tree::insert_file(&mut device, &mut allocator, "dir1/dir2/dir3/file.txt");
-        let _ = Tree::insert_file(&mut device, &mut allocator, "dir1/dir3/file.txt");
-        let _ = Tree::insert_file(&mut device, &mut allocator, "dir1/dir3/dir4/dir5/file.txt");
-        let _ = Tree::insert_file(&mut device, &mut allocator, "dir1/file.txt");
+        let _ = directory::insert_file(&mut device, &mut allocator, "dir1/dir2/dir3/file.txt");
+        let _ = directory::insert_file(&mut device, &mut allocator, "dir1/dir3/file.txt");
+        let _ = directory::insert_file(&mut device, &mut allocator, "dir1/dir3/dir4/dir5/file.txt");
+        let _ = directory::insert_file(&mut device, &mut allocator, "dir1/file.txt");
 
         let mut out = String::new();
         let result = print_to(&mut device, "dir1/file.txt", 0, &mut out);

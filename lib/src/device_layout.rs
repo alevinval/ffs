@@ -1,4 +1,4 @@
-use crate::{Addr, FixedLen, allocator::Bitmap, block::Block, constants, tree::TreeNode};
+use crate::{Addr, FixedLen, allocator::Bitmap, block::Block, constants, directory::TreeNode};
 
 const N_TREE: usize = 100;
 const N_FILE: usize = N_TREE * TreeNode::LEN;
